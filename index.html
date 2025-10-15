@@ -393,6 +393,20 @@
         const DFU_CLRSTATUS = 0x04;
         const DFU_ABORT = 0x06;
 
+        // DFU States
+        const dfuIDLE = 2;
+        const dfuDNLOAD_SYNC = 3;
+        const dfuDNBUSY = 4;
+        const dfuDNLOAD_IDLE = 5;
+        const dfuMANIFEST_SYNC = 6;
+        const dfuMANIFEST = 7;
+        const dfuMANIFEST_WAIT_RESET = 8;
+        const dfuERROR = 10;
+
+        // DfuSe Commands
+        const DFUSE_SET_ADDRESS = 0x21;
+        const DFUSE_ERASE_SECTOR = 0x41;
+
         // State
         let currentMode = null;
         let device = null;
@@ -511,9 +525,99 @@
             }
         }
 
+        // Helper function to get DFU status
+        async function getStatus() {
+            const iface = device.configuration.interfaces[0].interfaceNumber;
+            const result = await device.controlTransferIn({
+                requestType: 'class',
+                recipient: 'interface',
+                request: DFU_GETSTATUS,
+                value: 0,
+                index: iface
+            }, 6);
+
+            return {
+                status: result.data.getUint8(0),
+                pollTimeout: result.data.getUint32(1, true) & 0xFFFFFF,
+                state: result.data.getUint8(4)
+            };
+        }
+
+        // Poll until a specific state is reached
+        async function pollUntil(statePredicate) {
+            let dfuStatus = await getStatus();
+
+            while (!statePredicate(dfuStatus.state) && dfuStatus.state !== dfuERROR) {
+                await new Promise(r => setTimeout(r, dfuStatus.pollTimeout));
+                dfuStatus = await getStatus();
+            }
+
+            if (dfuStatus.state === dfuERROR) {
+                throw new Error(`DFU Error: status=${dfuStatus.status}`);
+            }
+
+            return dfuStatus;
+        }
+
+        // Poll until device returns to IDLE state
+        async function pollUntilIdle(idleState) {
+            return await pollUntil(state => state === idleState);
+        }
+
+        // Send DfuSe command (SET_ADDRESS or ERASE_SECTOR)
+        async function dfuseCommand(command, param, len) {
+            const iface = device.configuration.interfaces[0].interfaceNumber;
+
+            const payload = new ArrayBuffer(len + 1);
+            const view = new DataView(payload);
+            view.setUint8(0, command);
+            if (len === 1) {
+                view.setUint8(1, param);
+            } else if (len === 4) {
+                view.setUint32(1, param, true);
+            }
+
+            await device.controlTransferOut({
+                requestType: 'class',
+                recipient: 'interface',
+                request: DFU_DNLOAD,
+                value: 0,
+                index: iface
+            }, payload);
+
+            // Wait for command to complete
+            const status = await pollUntil(state => state !== dfuDNBUSY);
+            if (status.status !== 0) {
+                throw new Error(`DfuSe command failed: status=${status.status}`);
+            }
+        }
+
+        // Erase flash sectors before programming (required for QSPI)
+        async function eraseFlash(startAddr, length) {
+            updateStatus('Erasing flash sectors...', 'info');
+
+            // For QSPI: 4KB sectors
+            const SECTOR_SIZE = 4096;
+            const endAddr = startAddr + length;
+            let addr = startAddr - (startAddr % SECTOR_SIZE); // Align to sector boundary
+
+            const totalBytes = endAddr - addr;
+            let bytesErased = 0;
+
+            while (addr < endAddr) {
+                await dfuseCommand(DFUSE_ERASE_SECTOR, addr, 4);
+                addr += SECTOR_SIZE;
+                bytesErased += SECTOR_SIZE;
+
+                const progress = Math.min((bytesErased / totalBytes) * 30, 30); // 30% of progress bar
+                document.getElementById('progressFill').style.width = progress + '%';
+            }
+        }
+
         async function uploadBinary(data, address, isQSPI) {
             const iface = device.configuration.interfaces[0].interfaceNumber;
 
+            // Clear any errors
             await device.controlTransferOut({
                 requestType: 'class',
                 recipient: 'interface',
@@ -524,25 +628,14 @@
 
             await new Promise(r => setTimeout(r, 100));
 
-            const addrCmd = new ArrayBuffer(5);
-            const view = new DataView(addrCmd);
-            view.setUint8(0, 0x21);
-            view.setUint32(1, address, true);
-
-            await device.controlTransferOut({
-                requestType: 'class',
-                recipient: 'interface',
-                request: DFU_DNLOAD,
-                value: 0,
-                index: iface
-            }, addrCmd);
-
-            await new Promise(r => setTimeout(r, 100));
+            // For QSPI (firmware), we need to erase first
+            if (isQSPI) {
+                await eraseFlash(address, data.length);
+            }
 
             const BLOCK_SIZE = 2048;
-            const QSPI_DELAY = 10; // Optimized: 10ms instead of 20ms
             let offset = 0;
-            let blockNum = 2;
+            let currentAddr = address;
 
             updateStatus('Writing to flash memory...', 'info');
 
@@ -550,26 +643,38 @@
                 const size = Math.min(BLOCK_SIZE, data.length - offset);
                 const chunk = data.slice(offset, offset + size);
 
+                // Set address before each chunk (DfuSe protocol requirement)
+                await dfuseCommand(DFUSE_SET_ADDRESS, currentAddr, 4);
+
+                // Download the chunk (always use blockNum=2 for DfuSe)
                 await device.controlTransferOut({
                     requestType: 'class',
                     recipient: 'interface',
                     request: DFU_DNLOAD,
-                    value: blockNum++,
+                    value: 2,
                     index: iface
                 }, chunk.buffer);
 
-                if (isQSPI) {
-                    await new Promise(r => setTimeout(r, QSPI_DELAY));
-                }
+                // CRITICAL: Poll until device finishes writing this block
+                await pollUntilIdle(dfuDNLOAD_IDLE);
 
                 offset += size;
-                const progress = (offset / data.length) * 100;
-                document.getElementById('progressFill').style.width = progress + '%';
+                currentAddr += size;
 
-                if (Math.floor(progress) % 10 === 0) {
-                    updateStatus(`${Math.floor(progress)}% complete`, 'info');
+                // Progress: 30-90% for download phase
+                const downloadProgress = 30 + (offset / data.length) * 60;
+                document.getElementById('progressFill').style.width = downloadProgress + '%';
+
+                if (Math.floor(downloadProgress) % 10 === 0) {
+                    updateStatus(`${Math.floor(downloadProgress)}% complete`, 'info');
                 }
             }
+
+            updateStatus('Finalizing upload...', 'info');
+            document.getElementById('progressFill').style.width = '95%';
+
+            // Manifestation: Set address back to start, then send empty block
+            await dfuseCommand(DFUSE_SET_ADDRESS, address, 4);
 
             await device.controlTransferOut({
                 requestType: 'class',
@@ -579,8 +684,26 @@
                 index: iface
             }, new ArrayBuffer(0));
 
-            updateStatus('Upload complete, device resetting...', 'success');
-            await new Promise(r => setTimeout(r, 1000));
+            // Poll until manifestation
+            try {
+                await pollUntil(state => state === dfuMANIFEST);
+            } catch (error) {
+                // Manifestation may disconnect device, ignore errors
+                console.log('Manifest poll result:', error.message);
+            }
+
+            document.getElementById('progressFill').style.width = '100%';
+            updateStatus('Resetting device...', 'success');
+
+            // Reset the device to boot new firmware
+            try {
+                await device.reset();
+            } catch (error) {
+                // Reset often causes disconnect, which is expected
+                console.log('Reset result:', error.message);
+            }
+
+            await new Promise(r => setTimeout(r, 500));
         }
 
         function updateStatus(message, type) {
