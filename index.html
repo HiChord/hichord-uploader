@@ -355,34 +355,34 @@
             <div class="step-content">
                 <div class="tab-selector">
                     <div class="tab active" onclick="selectDevice('fresh')">
-                        New Daisy Seed
+                        Blank Daisy Seed
                     </div>
                     <div class="tab" onclick="selectDevice('hichord')">
-                        HiChord Device
+                        Update HiChord
                     </div>
                 </div>
 
                 <div class="tab-content active" id="fresh-content">
                     <div class="instruction-box warning">
-                        <h3>First-Time Setup</h3>
+                        <h3>First-Time Setup Required</h3>
                         <p style="font-size: 14px; line-height: 1.6;">
-                            Fresh Daisy Seeds require bootloader installation before firmware upload. This is a one-time operation.
+                            Blank Daisy Seeds require bootloader installation followed by firmware upload. This process will install both automatically.
                         </p>
                     </div>
                     <button class="big-button warning" onclick="startBootloaderInstall()">
-                        Install Bootloader
+                        Install Bootloader + Firmware
                     </button>
                 </div>
 
                 <div class="tab-content" id="hichord-content">
                     <div class="instruction-box success">
-                        <h3>Ready to Update</h3>
+                        <h3>Firmware Update</h3>
                         <p style="font-size: 14px; line-height: 1.6;">
-                            HiChord devices include the bootloader. Proceed directly to firmware update.
+                            For existing HiChord devices. Updates only the firmware using the Fn1+Fn2+Fn3 menu command.
                         </p>
                     </div>
                     <button class="big-button primary" onclick="startFirmwareUpdate()">
-                        Update Firmware
+                        Update Firmware Only
                     </button>
                 </div>
             </div>
@@ -454,9 +454,10 @@
         const DFUSE_ERASE_SECTOR = 0x41;
 
         // State
-        let currentMode = null;
+        let currentMode = null; // 'bootloader-only', 'firmware-after-bootloader', 'firmware-only'
         let device = null;
         let binary = null;
+        let needsFirmwareAfterBootloader = false;
 
         // UI Functions
         function selectDevice(type) {
@@ -481,7 +482,8 @@
         }
 
         async function startBootloaderInstall() {
-            currentMode = 'bootloader';
+            currentMode = 'bootloader-only';
+            needsFirmwareAfterBootloader = true; // Will upload firmware after bootloader
             goToStep(2);
 
             try {
@@ -492,19 +494,21 @@
             }
 
             document.getElementById('dfu-instructions').innerHTML = `
-                <h3>Hardware Connection</h3>
+                <h3>Enter ROM Bootloader Mode</h3>
                 <ul class="instruction-list">
-                    <li><strong>Connect:</strong> Daisy Seed via Micro USB to computer</li>
-                    <li><strong>Press + Hold:</strong> BOOT button</li>
+                    <li><strong>Connect:</strong> Blank Daisy Seed via Micro USB to computer</li>
+                    <li><strong>Press + Hold:</strong> BOOT button on Daisy Seed</li>
                     <li><strong>While Holding BOOT:</strong> Press and release RESET button</li>
                     <li><strong>Release:</strong> BOOT button</li>
-                    <li><strong>LED Indicator:</strong> Solid light confirms ROM bootloader mode</li>
+                    <li><strong>LED Indicator:</strong> Solid light confirms ROM bootloader active</li>
                 </ul>
+                <p style="color: var(--gray); font-size: 13px; margin-top: 16px; font-style: italic;">This installs the Daisy bootloader, then automatically uploads HiChord firmware.</p>
             `;
         }
 
         async function startFirmwareUpdate() {
-            currentMode = 'firmware';
+            currentMode = 'firmware-only';
+            needsFirmwareAfterBootloader = false;
             goToStep(2);
 
             try {
@@ -515,13 +519,13 @@
             }
 
             document.getElementById('dfu-instructions').innerHTML = `
-                <h3>Enter DFU Mode</h3>
+                <h3>Enter DFU Mode via HiChord Menu</h3>
                 <ul class="instruction-list">
                     <li><strong>Connect:</strong> HiChord via USB-C to computer</li>
                     <li><strong>Hold All Function Keys:</strong> Fn1 + Fn2 + Fn3 for 5 seconds</li>
-                    <li><strong>LED Indicator:</strong> Pulsing light confirms DFU mode</li>
+                    <li><strong>LED Indicator:</strong> Pulsing light confirms DFU mode active</li>
                 </ul>
-                <p style="color: var(--gray); font-size: 13px; margin-top: 16px; font-style: italic;">Alternative method: Press RESET, then BOOT within 2 seconds</p>
+                <p style="color: var(--gray); font-size: 13px; margin-top: 16px; font-style: italic;">Alternative: Press RESET button, then BOOT button within 2 seconds</p>
             `;
         }
 
@@ -554,21 +558,68 @@
 
                 await device.claimInterface(dfuInterface.interfaceNumber);
 
-                const address = currentMode === 'bootloader' ? 0x08000000 : 0x90040000;
-                const isQSPI = currentMode === 'firmware';
+                // Determine address and upload type based on mode
+                let address, isQSPI;
+                if (currentMode === 'bootloader-only') {
+                    address = 0x08000000; // Internal flash
+                    isQSPI = false;
+                } else {
+                    address = 0x90040000; // QSPI flash
+                    isQSPI = true;
+                }
 
                 await uploadBinary(binary, address, isQSPI);
 
-                goToStep(4);
-                const msg = currentMode === 'bootloader'
-                    ? 'Bootloader installation complete. Reload this page and select "HiChord Device" to upload firmware.'
-                    : 'Firmware update complete. Your HiChord is ready to use.';
-                document.getElementById('completeMessage').textContent = msg;
+                // If we just installed bootloader on blank Daisy, now upload firmware
+                if (needsFirmwareAfterBootloader) {
+                    await handleFirmwareAfterBootloader();
+                } else {
+                    // Single upload complete
+                    goToStep(4);
+                    const msg = currentMode === 'firmware-only'
+                        ? 'Firmware update complete. Your HiChord is ready to use.'
+                        : 'Setup complete. Your HiChord is ready to use.';
+                    document.getElementById('completeMessage').textContent = msg;
+                }
 
             } catch (error) {
                 updateStatus('❌ Error: ' + error.message, 'error');
                 console.error(error);
             }
+        }
+
+        async function handleFirmwareAfterBootloader() {
+            // Close the ROM bootloader connection
+            try {
+                await device.close();
+            } catch (e) {
+                console.log('Device close result:', e.message);
+            }
+
+            // Show instructions for entering Daisy bootloader
+            goToStep(2);
+            currentMode = 'firmware-after-bootloader';
+
+            try {
+                binary = await loadBinary(FIRMWARE_PATH);
+            } catch (error) {
+                updateStatus('❌ Failed to load firmware file: ' + error.message, 'error');
+                return;
+            }
+
+            document.getElementById('dfu-instructions').innerHTML = `
+                <h3>Enter Daisy Bootloader Mode</h3>
+                <ul class="instruction-list">
+                    <li><strong>Status:</strong> Bootloader installation complete</li>
+                    <li><strong>Press:</strong> RESET button on Daisy Seed</li>
+                    <li><strong>Then Press:</strong> BOOT button within 2 seconds</li>
+                    <li><strong>LED Indicator:</strong> Pulsing light confirms Daisy bootloader active</li>
+                </ul>
+                <p style="color: var(--gray); font-size: 13px; margin-top: 16px; font-style: italic;">Now we'll upload the HiChord firmware to QSPI flash.</p>
+            `;
+
+            // Change button text
+            document.getElementById('connectButton').textContent = 'Connect & Upload Firmware';
         }
 
         // Helper function to get DFU status
