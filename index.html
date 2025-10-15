@@ -521,23 +521,32 @@
             };
 
             dfu.Device.prototype.open = async function() {
+                this.logDebug("Opening USB device...");
                 await this.device_.open();
+
                 const confValue = this.settings.configuration.configurationValue;
+                this.logDebug(`Checking configuration: current=${this.device_.configuration?.configurationValue}, needed=${confValue}`);
                 if (this.device_.configuration === null ||
                     this.device_.configuration.configurationValue != confValue) {
+                    this.logDebug(`Selecting configuration ${confValue}...`);
                     await this.device_.selectConfiguration(confValue);
                 }
 
                 const intfNumber = this.settings["interface"].interfaceNumber;
+                this.logDebug(`Checking interface ${intfNumber}: claimed=${this.device_.configuration.interfaces[intfNumber].claimed}`);
                 if (!this.device_.configuration.interfaces[intfNumber].claimed) {
+                    this.logDebug(`Claiming interface ${intfNumber}...`);
                     await this.device_.claimInterface(intfNumber);
                 }
 
                 const altSetting = this.settings.alternate.alternateSetting;
                 let intf = this.device_.configuration.interfaces[intfNumber];
+                this.logDebug(`Checking alternate setting: current=${intf.alternate?.alternateSetting}, needed=${altSetting}`);
                 if (intf.alternate === null ||
                     intf.alternate.alternateSetting != altSetting) {
+                    this.logDebug(`Selecting alternate interface ${intfNumber} alt ${altSetting}...`);
                     await this.device_.selectAlternateInterface(intfNumber, altSetting);
+                    this.logDebug(`Successfully selected alternate interface ${altSetting}`);
                 }
             }
 
@@ -1109,6 +1118,13 @@
                 // Find DFU interfaces
                 const interfaces = dfu.findDeviceDfuInterfaces(selectedDevice);
                 console.log(`Found ${interfaces.length} DFU interface(s)`);
+
+                // Log all available interfaces for debugging
+                interfaces.forEach((ifc, idx) => {
+                    console.log(`  Interface ${idx}: ${ifc.name || 'unnamed'}`);
+                    console.log(`    - Interface number: ${ifc.interface.interfaceNumber}`);
+                    console.log(`    - Alternate setting: ${ifc.alternate.alternateSetting}`);
+                });
 
                 if (interfaces.length === 0) {
                     throw new Error('No DFU interface found');
