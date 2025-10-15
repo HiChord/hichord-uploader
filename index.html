@@ -5,1237 +5,294 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HiChord Uploader</title>
     <style>
+        :root {
+            --black: #0A0A0A;
+            --white: #FAFAFA;
+            --gray: #6B6B6B;
+            --light-gray: #D1D5DB;
+            --lightest-gray: #F3F4F6;
+            --accent: #FF6B35;
+            --accent-hover: #E85A28;
+            --success: #10b981;
+            --warning: #FFB800;
+            --error: #ef4444;
+        }
+
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
-        :root {
-            --black: #0A0A0A;
-            --white: #FAFAFA;
-            --gray: #6B6B6B;
-            --light-gray: #DADADA;
-            --lighter-gray: #F2F2F2;
-            --lightest-gray: #F8F8F8;
-            --accent: #FF6B35;
-            --accent-hover: #E85A28;
-            --accent-light: #FFF4F0;
-            --success: #10b981;
-            --warning: #FFB800;
-            --danger: #ef4444;
-            --border-light: #E5E7EB;
-            --border-medium: #D1D5DB;
-        }
-
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
             background: var(--white);
             color: var(--black);
-            line-height: 1.65;
-            padding: 40px 20px;
-            min-height: 100vh;
-            font-size: 15px;
-            font-weight: 400;
-            letter-spacing: -0.011em;
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.6;
         }
 
         .container {
-            max-width: 720px;
-            width: 100%;
+            max-width: 800px;
             margin: 0 auto;
+            padding: 40px 20px;
         }
 
         .header {
-            border-bottom: 1px solid var(--border-light);
-            padding-bottom: 20px;
-            margin-bottom: 40px;
+            text-align: center;
+            margin-bottom: 60px;
         }
 
         .header h1 {
             font-size: 48px;
-            font-weight: 600;
-            letter-spacing: -1.2px;
-            color: var(--black);
-            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: -0.02em;
             margin-bottom: 8px;
         }
 
         .header p {
-            font-size: 11px;
             color: var(--gray);
+            font-size: 14px;
             text-transform: uppercase;
-            letter-spacing: 1.8px;
-            font-weight: 500;
+            letter-spacing: 0.1em;
         }
 
         .step {
-            margin-bottom: 48px;
-            opacity: 0.35;
-            pointer-events: none;
-            transition: opacity 0.3s ease;
+            margin-bottom: 40px;
+            opacity: 0.4;
+            transition: opacity 0.2s;
         }
 
         .step.active {
             opacity: 1;
-            pointer-events: auto;
-        }
-
-        .step.complete {
-            opacity: 0.6;
         }
 
         .step-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             font-size: 22px;
+            text-transform: uppercase;
             font-weight: 600;
-            margin-bottom: 24px;
+            letter-spacing: 0.05em;
             padding: 16px 20px;
-            padding-left: 34px;
-            letter-spacing: 0.5px;
-            color: var(--black);
             border-left: 4px solid var(--light-gray);
             background: linear-gradient(90deg, var(--lightest-gray) 0%, transparent 100%);
-            text-transform: uppercase;
-            border-radius: 0 4px 4px 0;
-            transition: all 0.3s ease;
+            margin-bottom: 24px;
         }
 
         .step.active .step-header {
             border-left-color: var(--accent);
-            background: linear-gradient(90deg, var(--accent-light) 0%, transparent 100%);
         }
 
-        .step.complete .step-header {
-            border-left-color: var(--success);
-            background: linear-gradient(90deg, #d1fae5 0%, transparent 100%);
+        .step-number {
+            font-size: 18px;
+            color: var(--gray);
         }
 
         .step-content {
-            padding-left: 34px;
+            padding-left: 20px;
         }
 
-        .instruction-box {
-            border-left: 4px solid var(--accent);
-            padding: 20px 24px;
-            margin: 24px 0;
-            background: var(--accent-light);
-            border-radius: 0 6px 6px 0;
-            border: 1px solid var(--border-light);
-            border-left: 4px solid var(--accent);
+        .button-group {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
         }
 
-        .instruction-box.warning {
-            border-left-color: var(--warning);
-            background: #FFF9E6;
-        }
-
-        .instruction-box.success {
-            border-left-color: var(--success);
-            background: #d1fae5;
-        }
-
-        .instruction-box h3 {
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--black);
-            margin-bottom: 12px;
-            text-transform: uppercase;
-            letter-spacing: 1.2px;
-        }
-
-        .instruction-list {
-            list-style: none;
-            padding: 0;
-            margin: 0;
-        }
-
-        .instruction-list li {
-            padding: 10px 0;
-            color: var(--black);
-            font-size: 14px;
-            line-height: 1.6;
-            border-bottom: 1px solid var(--border-light);
-        }
-
-        .instruction-list li:last-child {
-            border-bottom: none;
-        }
-
-        .instruction-list li strong {
-            font-weight: 600;
-            color: var(--black);
-        }
-
-        .big-button {
-            width: 100%;
+        button {
+            flex: 1;
             padding: 16px 24px;
-            border: 2px solid var(--black);
-            background: var(--black);
-            color: var(--white);
-            border-radius: 0;
-            font-size: 13px;
+            font-size: 14px;
             font-weight: 600;
-            cursor: pointer;
-            transition: all 0.15s ease;
             text-transform: uppercase;
-            letter-spacing: 1.5px;
-            font-family: inherit;
-        }
-
-        .big-button:hover:not(:disabled) {
+            letter-spacing: 0.05em;
+            border: 2px solid var(--black);
             background: var(--white);
             color: var(--black);
-            border-color: var(--black);
+            cursor: pointer;
+            transition: all 0.2s;
         }
 
-        .big-button:disabled {
-            opacity: 0.3;
-            cursor: not-allowed;
+        button:hover:not(:disabled) {
+            background: var(--black);
+            color: var(--white);
         }
 
-        .big-button.primary {
+        button.primary {
             background: var(--accent);
             border-color: var(--accent);
             color: var(--white);
         }
 
-        .big-button.primary:hover:not(:disabled) {
+        button.primary:hover:not(:disabled) {
             background: var(--accent-hover);
             border-color: var(--accent-hover);
         }
 
-        .big-button.success {
-            background: var(--success);
-            border-color: var(--success);
-            color: var(--white);
+        button:disabled {
+            opacity: 0.3;
+            cursor: not-allowed;
         }
 
-        .big-button.success:hover:not(:disabled) {
-            background: #059669;
-            border-color: #059669;
-        }
-
-        .big-button.warning {
-            background: var(--warning);
-            border-color: var(--warning);
-            color: var(--black);
-        }
-
-        .big-button.warning:hover:not(:disabled) {
-            background: #F5A500;
-            border-color: #F5A500;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 3px;
-            background: var(--border-light);
-            border-radius: 0;
-            overflow: hidden;
-            margin: 24px 0;
-            display: none;
-            border: 1px solid var(--border-light);
-        }
-
-        .progress-bar.show {
-            display: block;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: var(--accent);
-            width: 0%;
-            transition: width 0.3s ease;
-        }
-
-        .status-message {
-            padding: 16px 20px;
-            margin: 20px 0;
-            font-weight: 500;
-            font-size: 13px;
-            letter-spacing: 0.3px;
-            display: none;
-            border-left: 4px solid;
-            border-radius: 0 4px 4px 0;
-        }
-
-        .status-message.show {
-            display: block;
-        }
-
-        .status-message.success {
-            background: #d1fae5;
-            color: #065f46;
-            border-left-color: var(--success);
-        }
-
-        .status-message.error {
-            background: #fee2e2;
-            color: #991b1b;
-            border-left-color: var(--danger);
-        }
-
-        .status-message.info {
+        .info-box {
+            padding: 20px;
             background: var(--lightest-gray);
-            color: var(--black);
-            border-left-color: var(--gray);
+            border-left: 4px solid var(--warning);
+            margin-bottom: 20px;
         }
 
-        .tab-selector {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .tab {
-            padding: 16px 24px;
-            background: var(--white);
-            border: 2px solid var(--border-light);
-            text-align: center;
-            cursor: pointer;
+        .info-box h3 {
+            font-size: 14px;
             font-weight: 600;
-            font-size: 13px;
-            color: var(--gray);
-            transition: all 0.15s ease;
             text-transform: uppercase;
-            letter-spacing: 1.2px;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
         }
 
-        .tab:hover {
-            border-color: var(--border-medium);
+        .info-box p {
+            font-size: 14px;
+            color: var(--gray);
+            line-height: 1.5;
         }
 
-        .tab.active {
-            background: var(--black);
-            border-color: var(--black);
-            color: var(--white);
+        #status {
+            font-size: 14px;
+            padding: 12px 16px;
+            background: var(--lightest-gray);
+            color: var(--gray);
+            margin-bottom: 20px;
+            text-align: center;
         }
 
-        .tab-content {
-            display: none;
+        #usbInfo, #dfuInfo {
+            font-size: 12px;
+            font-family: 'Courier New', monospace;
+            color: var(--gray);
+            white-space: pre-wrap;
+            padding: 12px;
+            background: var(--lightest-gray);
+            margin-bottom: 12px;
+            max-height: 200px;
+            overflow-y: auto;
         }
 
-        .tab-content.active {
-            display: block;
+        #downloadLog {
+            min-height: 100px;
+            max-height: 300px;
+            overflow-y: auto;
+            padding: 16px;
+            background: var(--lightest-gray);
+            font-size: 13px;
         }
 
-        @media (max-width: 640px) {
-            body {
-                padding: 20px 16px;
-            }
+        #downloadLog p {
+            margin: 4px 0;
+        }
 
-            .header h1 {
-                font-size: 36px;
-            }
+        #downloadLog .info {
+            color: var(--black);
+        }
 
-            .step-content {
-                padding-left: 20px;
-            }
+        #downloadLog .warning {
+            color: var(--warning);
+        }
 
-            .step-header {
-                font-size: 18px;
-                padding-left: 24px;
-            }
+        #downloadLog .error {
+            color: var(--error);
+        }
+
+        #downloadLog progress {
+            width: 100%;
+            height: 8px;
+            margin: 8px 0;
+        }
+
+        progress {
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        progress::-webkit-progress-bar {
+            background: var(--light-gray);
+        }
+
+        progress::-webkit-progress-value {
+            background: var(--accent);
+        }
+
+        progress::-moz-progress-bar {
+            background: var(--accent);
+        }
+
+        .instructions {
+            font-size: 14px;
+            color: var(--gray);
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .instructions ol {
+            padding-left: 20px;
+        }
+
+        .instructions li {
+            margin: 8px 0;
+        }
+
+        .instructions strong {
+            color: var(--black);
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>HiChord</h1>
-            <p>Firmware Uploader // Web DFU</p>
+            <h1>HICHORD</h1>
+            <p>FIRMWARE UPLOADER // WEB DFU</p>
         </div>
 
-        <!-- STEP 1: Choose Path -->
-        <div class="step active" id="step1">
-            <div class="step-header">01 // Select Device Type</div>
+        <!-- Step 1: Connect Your Device -->
+        <div class="step active">
+            <div class="step-header">
+                <span class="step-number">01 //</span>
+                <span>ENTER DFU MODE</span>
+            </div>
             <div class="step-content">
-                <div class="tab-selector">
-                    <div class="tab active" onclick="selectDevice('fresh')">
-                        Blank Daisy Seed
-                    </div>
-                    <div class="tab" onclick="selectDevice('hichord')">
-                        Update HiChord
-                    </div>
+                <div class="instructions">
+                    <ol>
+                        <li><strong>Hold the BOOT button</strong> on your Daisy Seed</li>
+                        <li><strong>While holding BOOT</strong>, press and release the RESET button</li>
+                        <li><strong>Release the BOOT button</strong></li>
+                        <li><strong>Connect USB cable</strong> to your computer</li>
+                    </ol>
                 </div>
 
-                <div class="tab-content active" id="fresh-content">
-                    <div class="instruction-box warning">
-                        <h3>First-Time Setup Required</h3>
-                        <p style="font-size: 14px; line-height: 1.6;">
-                            Blank Daisy Seeds require bootloader installation followed by firmware upload. This process will install both automatically.
-                        </p>
-                    </div>
-                    <button class="big-button warning" onclick="startBootloaderInstall()">
-                        Install Bootloader + Firmware
-                    </button>
-                </div>
+                <div id="status">Ready to connect</div>
+                <div id="usbInfo"></div>
+                <div id="dfuInfo"></div>
 
-                <div class="tab-content" id="hichord-content">
-                    <div class="instruction-box success">
-                        <h3>Firmware Update</h3>
-                        <p style="font-size: 14px; line-height: 1.6;">
-                            For existing HiChord devices. Updates only the firmware using the Fn1+Fn2+Fn3 menu command.
-                        </p>
-                    </div>
-                    <button class="big-button primary" onclick="startFirmwareUpdate()">
-                        Update Firmware Only
-                    </button>
-                </div>
+                <button id="connect" class="primary">CONNECT</button>
             </div>
         </div>
 
-        <!-- STEP 2: Enter DFU Mode -->
-        <div class="step" id="step2">
-            <div class="step-header">02 // Enter DFU Mode</div>
-            <div class="step-content">
-                <div class="instruction-box" id="dfu-instructions">
-                    <!-- Instructions will be inserted here -->
-                </div>
-                <button class="big-button primary" id="connectButton" onclick="connectAndUpload()">
-                    Connect & Upload
-                </button>
+        <!-- Step 2: Upload -->
+        <div class="step active">
+            <div class="step-header">
+                <span class="step-number">02 //</span>
+                <span>UPLOAD</span>
             </div>
-        </div>
-
-        <!-- STEP 3: Upload Progress -->
-        <div class="step" id="step3">
-            <div class="step-header">03 // Upload Progress</div>
             <div class="step-content">
-                <div class="progress-bar show">
-                    <div class="progress-fill" id="progressFill"></div>
-                </div>
-                <div class="status-message show info" id="statusMessage">
-                    Preparing upload...
-                </div>
-            </div>
-        </div>
+                <button id="bootloader" disabled style="width: 100%; margin-bottom: 16px;">FLASH BOOTLOADER</button>
+                <button id="download" class="primary" disabled style="width: 100%;">PROGRAM FIRMWARE</button>
 
-        <!-- STEP 4: Complete -->
-        <div class="step" id="step4">
-            <div class="step-header">04 // Complete</div>
-            <div class="step-content">
-                <div class="status-message show success" id="completeMessage">
-                    <!-- Success message will be inserted here -->
-                </div>
-                <button class="big-button success" onclick="location.reload()">
-                    Upload Another Device
-                </button>
+                <div id="downloadLog"></div>
             </div>
         </div>
     </div>
 
-    <script>
-        // Binary file paths - relative to this HTML file
-        const FIRMWARE_PATH = 'firmware/hichord_unified.bin';
-        const BOOTLOADER_PATH = 'boot/dsy_bootloader_v6_2-extdfu-10ms.bin';
-
-        // ========================================
-        // COMPLETE ELECTRO-SMITH DFU.JS IMPLEMENTATION
-        // ========================================
-        var dfu = {};
-
-        (function() {
-            'use strict';
-
-            dfu.DETACH = 0x00;
-            dfu.DNLOAD = 0x01;
-            dfu.UPLOAD = 0x02;
-            dfu.GETSTATUS = 0x03;
-            dfu.CLRSTATUS = 0x04;
-            dfu.GETSTATE = 0x05;
-            dfu.ABORT = 6;
-
-            dfu.appIDLE = 0;
-            dfu.appDETACH = 1;
-            dfu.dfuIDLE = 2;
-            dfu.dfuDNLOAD_SYNC = 3;
-            dfu.dfuDNBUSY = 4;
-            dfu.dfuDNLOAD_IDLE = 5;
-            dfu.dfuMANIFEST_SYNC = 6;
-            dfu.dfuMANIFEST = 7;
-            dfu.dfuMANIFEST_WAIT_RESET = 8;
-            dfu.dfuUPLOAD_IDLE = 9;
-            dfu.dfuERROR = 10;
-
-            dfu.STATUS_OK = 0x0;
-
-            dfu.Device = function(device, settings) {
-                this.device_ = device;
-                this.settings = settings;
-                this.intfNumber = settings["interface"].interfaceNumber;
-            };
-
-            dfu.findDeviceDfuInterfaces = function(device) {
-                let interfaces = [];
-                for (let conf of device.configurations) {
-                    for (let intf of conf.interfaces) {
-                        for (let alt of intf.alternates) {
-                            if (alt.interfaceClass == 0xFE &&
-                                alt.interfaceSubclass == 0x01 &&
-                                (alt.interfaceProtocol == 0x01 || alt.interfaceProtocol == 0x02)) {
-                                let settings = {
-                                    "configuration": conf,
-                                    "interface": intf,
-                                    "alternate": alt,
-                                    "name": alt.interfaceName
-                                };
-                                interfaces.push(settings);
-                            }
-                        }
-                    }
-                }
-
-                return interfaces;
-            }
-
-            dfu.Device.prototype.logDebug = function(msg) {
-                console.log('[DFU DEBUG] ' + msg);
-            };
-
-            dfu.Device.prototype.logInfo = function(msg) {
-                console.log('[DFU INFO] ' + msg);
-                updateStatus(msg, 'info');
-            };
-
-            dfu.Device.prototype.logWarning = function(msg) {
-                console.log(msg);
-            };
-
-            dfu.Device.prototype.logError = function(msg) {
-                console.error('[DFU ERROR] ' + msg);
-                updateStatus('Error: ' + msg, 'error');
-            };
-
-            dfu.Device.prototype.logProgress = function(done, total) {
-                if (typeof total === 'undefined') {
-                    console.log(done)
-                } else {
-                    const percent = (done / total) * 100;
-                    document.getElementById('progressFill').style.width = percent + '%';
-                    console.log(done + '/' + total);
-                }
-            };
-
-            dfu.Device.prototype.open = async function() {
-                this.logDebug("Opening USB device...");
-                await this.device_.open();
-
-                const confValue = this.settings.configuration.configurationValue;
-                this.logDebug(`Checking configuration: current=${this.device_.configuration?.configurationValue}, needed=${confValue}`);
-                if (this.device_.configuration === null ||
-                    this.device_.configuration.configurationValue != confValue) {
-                    this.logDebug(`Selecting configuration ${confValue}...`);
-                    await this.device_.selectConfiguration(confValue);
-                }
-
-                const intfNumber = this.settings["interface"].interfaceNumber;
-                this.logDebug(`Checking interface ${intfNumber}: claimed=${this.device_.configuration.interfaces[intfNumber].claimed}`);
-                if (!this.device_.configuration.interfaces[intfNumber].claimed) {
-                    this.logDebug(`Claiming interface ${intfNumber}...`);
-                    await this.device_.claimInterface(intfNumber);
-                }
-
-                const altSetting = this.settings.alternate.alternateSetting;
-                let intf = this.device_.configuration.interfaces[intfNumber];
-                this.logDebug(`Checking alternate setting: current=${intf.alternate?.alternateSetting}, needed=${altSetting}`);
-                if (intf.alternate === null ||
-                    intf.alternate.alternateSetting != altSetting) {
-                    this.logDebug(`Selecting alternate interface ${intfNumber} alt ${altSetting}...`);
-                    await this.device_.selectAlternateInterface(intfNumber, altSetting);
-                    this.logDebug(`Successfully selected alternate interface ${altSetting}`);
-                }
-            }
-
-            dfu.Device.prototype.close = async function() {
-                try {
-                    await this.device_.close();
-                } catch (error) {
-                    console.log(error);
-                }
-            };
-
-            dfu.Device.prototype.requestOut = function(bRequest, data, wValue=0) {
-                return this.device_.controlTransferOut({
-                    "requestType": "class",
-                    "recipient": "interface",
-                    "request": bRequest,
-                    "value": wValue,
-                    "index": this.intfNumber
-                }, data).then(
-                    result => {
-                        if (result.status == "ok") {
-                            return Promise.resolve(result.bytesWritten);
-                        } else {
-                            return Promise.reject(result.status);
-                        }
-                    },
-                    error => {
-                        return Promise.reject("ControlTransferOut failed: " + error);
-                    }
-                );
-            };
-
-            dfu.Device.prototype.requestIn = function(bRequest, wLength, wValue=0) {
-                return this.device_.controlTransferIn({
-                    "requestType": "class",
-                    "recipient": "interface",
-                    "request": bRequest,
-                    "value": wValue,
-                    "index": this.intfNumber
-                }, wLength).then(
-                    result => {
-                        if (result.status == "ok") {
-                            return Promise.resolve(result.data);
-                        } else {
-                            return Promise.reject(result.status);
-                        }
-                    },
-                    error => {
-                        return Promise.reject("ControlTransferIn failed: " + error);
-                    }
-                );
-            };
-
-            dfu.Device.prototype.download = function(data, blockNum) {
-                return this.requestOut(dfu.DNLOAD, data, blockNum);
-            };
-
-            dfu.Device.prototype.dnload = dfu.Device.prototype.download;
-
-            dfu.Device.prototype.clearStatus = function() {
-                return this.requestOut(dfu.CLRSTATUS);
-            };
-
-            dfu.Device.prototype.clrStatus = dfu.Device.prototype.clearStatus;
-
-            dfu.Device.prototype.getStatus = function() {
-                return this.requestIn(dfu.GETSTATUS, 6).then(
-                    data =>
-                        Promise.resolve({
-                            "status": data.getUint8(0),
-                            "pollTimeout": data.getUint32(1, true) & 0xFFFFFF,
-                            "state": data.getUint8(4)
-                        }),
-                    error =>
-                        Promise.reject("DFU GETSTATUS failed: " + error)
-                );
-            };
-
-            dfu.Device.prototype.getState = function() {
-                return this.requestIn(dfu.GETSTATE, 1).then(
-                    data => Promise.resolve(data.getUint8(0)),
-                    error => Promise.reject("DFU GETSTATE failed: " + error)
-                );
-            };
-
-            dfu.Device.prototype.abort = function() {
-                return this.requestOut(dfu.ABORT);
-            };
-
-            dfu.Device.prototype.abortToIdle = async function() {
-                await this.abort();
-                let state = await this.getState();
-                if (state == dfu.dfuERROR) {
-                    await this.clearStatus();
-                    state = await this.getState();
-                }
-                if (state != dfu.dfuIDLE) {
-                    throw "Failed to return to idle state after abort: state " + state.state;
-                }
-            };
-
-            dfu.Device.prototype.poll_until = async function(state_predicate) {
-                let dfu_status = await this.getStatus();
-
-                let device = this;
-                function async_sleep(duration_ms) {
-                    return new Promise(function(resolve, reject) {
-                        device.logDebug("Sleeping for " + duration_ms + "ms");
-                        setTimeout(resolve, duration_ms);
-                    });
-                }
-
-                while (!state_predicate(dfu_status.state) && dfu_status.state != dfu.dfuERROR) {
-                    await async_sleep(dfu_status.pollTimeout);
-                    dfu_status = await this.getStatus();
-                }
-
-                return dfu_status;
-            };
-
-            dfu.Device.prototype.poll_until_idle = function(idle_state) {
-                return this.poll_until(state => (state == idle_state));
-            };
-
-            dfu.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant) {
-                let bytes_sent = 0;
-                let expected_size = data.byteLength;
-                let transaction = 0;
-
-                this.logInfo("Copying data from browser to DFU device");
-                this.logDebug(`Total size: ${expected_size} bytes, Transfer size: ${xfer_size} bytes`);
-
-                // Initialize progress to 0
-                this.logProgress(bytes_sent, expected_size);
-
-                while (bytes_sent < expected_size) {
-                    const bytes_left = expected_size - bytes_sent;
-                    const chunk_size = Math.min(bytes_left, xfer_size);
-
-                    let bytes_written = 0;
-                    let dfu_status;
-                    try {
-                        this.logDebug(`Transaction ${transaction}: Sending ${chunk_size} bytes...`);
-                        bytes_written = await this.download(data.slice(bytes_sent, bytes_sent+chunk_size), transaction++);
-                        this.logDebug(`Transaction complete: Sent ${bytes_written} bytes, polling device status...`);
-                        dfu_status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
-                        this.logDebug(`Device status: state=${dfu_status.state}, status=${dfu_status.status}`);
-                    } catch (error) {
-                        throw "Error during DFU download: " + error;
-                    }
-
-                    if (dfu_status.status != dfu.STATUS_OK) {
-                        throw `DFU DOWNLOAD failed state=${dfu_status.state}, status=${dfu_status.status}`;
-                    }
-
-                    this.logDebug("Wrote " + bytes_written + " bytes");
-                    bytes_sent += bytes_written;
-
-                    this.logProgress(bytes_sent, expected_size);
-                }
-
-                this.logDebug("Sending empty block");
-                try {
-                    await this.download(new ArrayBuffer([]), transaction++);
-                } catch (error) {
-                    throw "Error during final DFU download: " + error;
-                }
-
-                this.logInfo("Wrote " + bytes_sent + " bytes");
-                this.logInfo("Manifesting new firmware");
-
-                if (manifestationTolerant) {
-                    // Transition to MANIFEST_SYNC state
-                    let dfu_status;
-                    try {
-                        // Wait until it returns to idle.
-                        // If it's not really manifestation tolerant, it might transition to MANIFEST_WAIT_RESET
-                        dfu_status = await this.poll_until(state => (state == dfu.dfuIDLE || state == dfu.dfuMANIFEST_WAIT_RESET));
-                        if (dfu_status.state == dfu.dfuMANIFEST_WAIT_RESET) {
-                            this.logDebug("Device transitioned to MANIFEST_WAIT_RESET even though it is manifestation tolerant");
-                        }
-                        if (dfu_status.status != dfu.STATUS_OK) {
-                            throw `DFU MANIFEST failed state=${dfu_status.state}, status=${dfu_status.status}`;
-                        }
-                    } catch (error) {
-                        if (error.endsWith("ControlTransferIn failed: NotFoundError: Device unavailable.") ||
-                            error.endsWith("ControlTransferIn failed: NotFoundError: The device was disconnected.")) {
-                            this.logWarning("Unable to poll final manifestation status");
-                        } else {
-                            throw "Error during DFU manifest: " + error;
-                        }
-                    }
-                } else {
-                    // Try polling once to initiate manifestation
-                    try {
-                        let final_status = await this.getStatus();
-                        this.logDebug(`Final DFU status: state=${final_status.state}, status=${final_status.status}`);
-                    } catch (error) {
-                        this.logDebug("Manifest GET_STATUS poll error: " + error);
-                    }
-                }
-
-                // Reset to exit MANIFEST_WAIT_RESET
-                try {
-                    await this.device_.reset();
-                } catch (error) {
-                    if (error == "NetworkError: Unable to reset the device." ||
-                        error == "NotFoundError: Device unavailable." ||
-                        error == "NotFoundError: The device was disconnected.") {
-                        this.logDebug("Ignored reset error");
-                    } else {
-                        throw "Error during reset for manifestation: " + error;
-                    }
-                }
-
-                return;
-            };
-        })();
-
-        // ========================================
-        // COMPLETE ELECTRO-SMITH DFUSE.JS IMPLEMENTATION
-        // ========================================
-        var dfuse = {};
-
-        (function() {
-            'use strict';
-
-            dfuse.GET_COMMANDS = 0x00;
-            dfuse.SET_ADDRESS = 0x21;
-            dfuse.ERASE_SECTOR = 0x41;
-
-            dfuse.Device = function(device, settings) {
-                dfu.Device.call(this, device, settings);
-                this.memoryInfo = null;
-                this.startAddress = NaN;
-                if (settings.name) {
-                    this.memoryInfo = dfuse.parseMemoryDescriptor(settings.name);
-                }
-            }
-
-            dfuse.Device.prototype = Object.create(dfu.Device.prototype);
-            dfuse.Device.prototype.constructor = dfuse.Device;
-
-            dfuse.parseMemoryDescriptor = function(desc) {
-                const nameEndIndex = desc.indexOf("/");
-                if (!desc.startsWith("@") || nameEndIndex == -1) {
-                    throw `Not a DfuSe memory descriptor: "${desc}"`;
-                }
-
-                const name = desc.substring(1, nameEndIndex).trim();
-                const segmentString = desc.substring(nameEndIndex);
-
-                let segments = [];
-
-                const sectorMultipliers = {
-                    ' ': 1,
-                    'B': 1,
-                    'K': 1024,
-                    'M': 1048576
-                };
-
-                let contiguousSegmentRegex = /\/\s*(0x[0-9a-fA-F]{1,8})\s*\/(\s*[0-9]+\s*\*\s*[0-9]+\s?[ BKM]\s*[abcdefg]\s*,?\s*)+/g;
-                let contiguousSegmentMatch;
-                while (contiguousSegmentMatch = contiguousSegmentRegex.exec(segmentString)) {
-                    let segmentRegex = /([0-9]+)\s*\*\s*([0-9]+)\s?([ BKM])\s*([abcdefg])\s*,?\s*/g;
-                    let startAddress = parseInt(contiguousSegmentMatch[1], 16);
-                    let segmentMatch;
-                    while (segmentMatch = segmentRegex.exec(contiguousSegmentMatch[0])) {
-                        let segment = {}
-                        let sectorCount = parseInt(segmentMatch[1], 10);
-                        let sectorSize = parseInt(segmentMatch[2]) * sectorMultipliers[segmentMatch[3]];
-                        let properties = segmentMatch[4].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
-                        segment.start = startAddress;
-                        segment.sectorSize = sectorSize;
-                        segment.end = startAddress + sectorSize * sectorCount;
-                        segment.readable = (properties & 0x1) != 0;
-                        segment.erasable = (properties & 0x2) != 0;
-                        segment.writable = (properties & 0x4) != 0;
-                        segments.push(segment);
-
-                        startAddress += sectorSize * sectorCount;
-                    }
-                }
-
-                return {"name": name, "segments": segments};
-            };
-
-            dfuse.Device.prototype.dfuseCommand = async function(command, param, len) {
-                if (typeof param === 'undefined' && typeof len === 'undefined') {
-                    param = 0x00;
-                    len = 1;
-                }
-
-                const commandNames = {
-                    0x00: "GET_COMMANDS",
-                    0x21: "SET_ADDRESS",
-                    0x41: "ERASE_SECTOR"
-                };
-
-                let payload = new ArrayBuffer(len + 1);
-                let view = new DataView(payload);
-                view.setUint8(0, command);
-                if (len == 1) {
-                    view.setUint8(1, param);
-                } else if (len == 4) {
-                    view.setUint32(1, param, true);
-                } else {
-                    throw "Don't know how to handle data of len " + len;
-                }
-
-                try {
-                    await this.download(payload, 0);
-                } catch (error) {
-                    throw "Error during special DfuSe command " + commandNames[command] + ":" + error;
-                }
-
-                let status = await this.poll_until(state => (state != dfu.dfuDNBUSY));
-                if (status.status != dfu.STATUS_OK) {
-                    throw "Special DfuSe command " + commandNames[command] + " failed";
-                }
-            };
-
-            dfuse.Device.prototype.getSegment = function(addr) {
-                if (!this.memoryInfo || ! this.memoryInfo.segments) {
-                    throw "No memory map information available";
-                }
-
-                for (let segment of this.memoryInfo.segments) {
-                    if (segment.start <= addr && addr < segment.end) {
-                        return segment;
-                    }
-                }
-
-                return null;
-            };
-
-            dfuse.Device.prototype.getSectorStart = function(addr, segment) {
-                if (typeof segment === 'undefined') {
-                    segment = this.getSegment(addr);
-                }
-
-                if (!segment) {
-                    throw `Address ${addr.toString(16)} outside of memory map`;
-                }
-
-                const sectorIndex = Math.floor((addr - segment.start)/segment.sectorSize);
-                return segment.start + sectorIndex * segment.sectorSize;
-            };
-
-            dfuse.Device.prototype.getSectorEnd = function(addr, segment) {
-                if (typeof segment === 'undefined') {
-                    segment = this.getSegment(addr);
-                }
-
-                if (!segment) {
-                    throw `Address ${addr.toString(16)} outside of memory map`;
-                }
-
-                const sectorIndex = Math.floor((addr - segment.start)/segment.sectorSize);
-                return segment.start + (sectorIndex + 1) * segment.sectorSize;
-            };
-
-            dfuse.Device.prototype.getFirstWritableSegment = function() {
-                if (!this.memoryInfo || ! this.memoryInfo.segments) {
-                    throw "No memory map information available";
-                }
-
-                for (let segment of this.memoryInfo.segments) {
-                    if (segment.writable) {
-                        return segment;
-                    }
-                }
-
-                return null;
-            };
-
-            dfuse.Device.prototype.erase = async function(startAddr, length) {
-                let segment = this.getSegment(startAddr);
-                let addr = this.getSectorStart(startAddr, segment);
-                const endAddr = this.getSectorEnd(startAddr + length - 1);
-
-                let bytesErased = 0;
-                const bytesToErase = endAddr - addr;
-                if (bytesToErase > 0) {
-                    this.logProgress(bytesErased, bytesToErase);
-                }
-
-                while (addr < endAddr) {
-                    if (segment.end <= addr) {
-                        segment = this.getSegment(addr);
-                    }
-                    if (!segment.erasable) {
-                        // Skip over the non-erasable section
-                        bytesErased = Math.min(bytesErased + segment.end - addr, bytesToErase);
-                        addr = segment.end;
-                        this.logProgress(bytesErased, bytesToErase);
-                        continue;
-                    }
-                    const sectorIndex = Math.floor((addr - segment.start)/segment.sectorSize);
-                    const sectorAddr = segment.start + sectorIndex * segment.sectorSize;
-                    this.logDebug(`Erasing ${segment.sectorSize}B at 0x${sectorAddr.toString(16)}`);
-                    await this.dfuseCommand(dfuse.ERASE_SECTOR, sectorAddr, 4);
-                    addr = sectorAddr + segment.sectorSize;
-                    bytesErased += segment.sectorSize;
-                    this.logProgress(bytesErased, bytesToErase);
-                }
-            };
-
-            dfuse.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant) {
-                if (!this.memoryInfo || ! this.memoryInfo.segments) {
-                    throw "No memory map available";
-                }
-
-                this.logInfo("Erasing DFU device memory");
-
-                let bytes_sent = 0;
-                let expected_size = data.byteLength;
-
-                let startAddress = this.startAddress;
-                if (isNaN(startAddress)) {
-                    startAddress = this.memoryInfo.segments[0].start;
-                    this.logWarning("Using inferred start address 0x" + startAddress.toString(16));
-                } else if (this.getSegment(startAddress) === null) {
-                    this.logError(`Start address 0x${startAddress.toString(16)} outside of memory map bounds`);
-                }
-                await this.erase(startAddress, expected_size);
-
-                this.logInfo("Copying data from browser to DFU device");
-
-                let address = startAddress;
-                while (bytes_sent < expected_size) {
-                    const bytes_left = expected_size - bytes_sent;
-                    const chunk_size = Math.min(bytes_left, xfer_size);
-
-                    let bytes_written = 0;
-                    let dfu_status;
-                    try {
-                        await this.dfuseCommand(dfuse.SET_ADDRESS, address, 4);
-                        this.logDebug(`Set address to 0x${address.toString(16)}`);
-                        bytes_written = await this.download(data.slice(bytes_sent, bytes_sent+chunk_size), 2);
-                        this.logDebug("Sent " + bytes_written + " bytes");
-                        dfu_status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
-                        address += chunk_size;
-                    } catch (error) {
-                        throw "Error during DfuSe download: " + error;
-                    }
-
-                    if (dfu_status.status != dfu.STATUS_OK) {
-                        throw `DFU DOWNLOAD failed state=${dfu_status.state}, status=${dfu_status.status}`;
-                    }
-
-                    this.logDebug("Wrote " + bytes_written + " bytes");
-                    bytes_sent += bytes_written;
-
-                    this.logProgress(bytes_sent, expected_size);
-                }
-                this.logInfo(`Wrote ${bytes_sent} bytes`);
-
-                this.logInfo("Manifesting new firmware");
-                try {
-                    await this.dfuseCommand(dfuse.SET_ADDRESS, startAddress, 4);
-                    await this.download(new ArrayBuffer(), 0);
-                } catch (error) {
-                    throw "Error during DfuSe manifestation: " + error;
-                }
-
-                try {
-                    await this.poll_until(state => (state == dfu.dfuMANIFEST));
-                } catch (error) {
-                    this.logError(error);
-                }
-            }
-        })();
-
-        // ========================================
-        // HICHORD UPLOADER UI AND CONTROL
-        // ========================================
-
-        // State
-        let currentMode = null; // 'bootloader', 'firmware'
-        let dfuDevice = null;
-        let binary = null;
-        let needsFirmwareAfterBootloader = false;
-
-        // UI Functions
-        function selectDevice(type) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-
-            if (type === 'fresh') {
-                event.target.classList.add('active');
-                document.getElementById('fresh-content').classList.add('active');
-            } else {
-                event.target.closest('.tab').classList.add('active');
-                document.getElementById('hichord-content').classList.add('active');
-            }
-        }
-
-        function goToStep(stepNum) {
-            document.querySelectorAll('.step').forEach((step, idx) => {
-                step.classList.remove('active', 'complete');
-                if (idx + 1 < stepNum) step.classList.add('complete');
-                if (idx + 1 === stepNum) step.classList.add('active');
-            });
-        }
-
-        async function startBootloaderInstall() {
-            currentMode = 'bootloader';
-            needsFirmwareAfterBootloader = true;
-            goToStep(2);
-
-            try {
-                const response = await fetch(BOOTLOADER_PATH);
-                if (!response.ok) throw new Error('File not found: ' + BOOTLOADER_PATH);
-                binary = await response.arrayBuffer();
-                console.log(`Loaded bootloader: ${(binary.byteLength / 1024).toFixed(1)} KB`);
-            } catch (error) {
-                updateStatus('❌ Failed to load bootloader file: ' + error.message, 'error');
-                return;
-            }
-
-            document.getElementById('dfu-instructions').innerHTML = `
-                <h3>Enter Bootloader Mode (ROM)</h3>
-                <ul class="instruction-list">
-                    <li>Connect Daisy Seed via <strong>Micro USB</strong></li>
-                    <li>Press and <strong>HOLD</strong> the BOOT button</li>
-                    <li>While holding BOOT, press and <strong>RELEASE</strong> RESET</li>
-                    <li>Now release the BOOT button</li>
-                    <li>LED should stay solid (ROM bootloader active)</li>
-                </ul>
-            `;
-        }
-
-        async function startFirmwareUpdate() {
-            currentMode = 'firmware';
-            needsFirmwareAfterBootloader = false;
-            goToStep(2);
-
-            try {
-                const response = await fetch(FIRMWARE_PATH);
-                if (!response.ok) throw new Error('File not found: ' + FIRMWARE_PATH);
-                binary = await response.arrayBuffer();
-                console.log(`Loaded firmware: ${(binary.byteLength / 1024).toFixed(1)} KB`);
-            } catch (error) {
-                updateStatus('❌ Failed to load firmware file: ' + error.message, 'error');
-                return;
-            }
-
-            document.getElementById('dfu-instructions').innerHTML = `
-                <h3>Enter Firmware Update Mode</h3>
-                <ul class="instruction-list">
-                    <li>Connect HiChord via <strong>USB-C</strong></li>
-                    <li>Hold <strong>Fn1 + Fn2 + Fn3</strong> for 5 seconds</li>
-                    <li>LED should pulse (DFU mode activated)</li>
-                </ul>
-                <p style="color: #6b7280; font-size: 13px; margin-top: 12px;"><em>Alternative: Press RESET then BOOT within 2 seconds</em></p>
-            `;
-        }
-
-        async function connectAndUpload() {
-            try {
-                goToStep(3);
-                updateStatus('Requesting DFU device...', 'info');
-
-                const selectedDevice = await navigator.usb.requestDevice({
-                    filters: [{ vendorId: 0x0483, productId: 0xdf11 }]
-                });
-
-                // Find DFU interfaces
-                const interfaces = dfu.findDeviceDfuInterfaces(selectedDevice);
-                console.log(`Found ${interfaces.length} DFU interface(s)`);
-
-                // Log all available interfaces for debugging
-                interfaces.forEach((ifc, idx) => {
-                    console.log(`  Interface ${idx}: ${ifc.name || 'unnamed'}`);
-                    console.log(`    - Interface number: ${ifc.interface.interfaceNumber}`);
-                    console.log(`    - Alternate setting: ${ifc.alternate.alternateSetting}`);
-                });
-
-                if (interfaces.length === 0) {
-                    throw new Error('No DFU interface found');
-                }
-
-                // Select the correct interface based on mode
-                let selectedInterface;
-                if (currentMode === 'bootloader') {
-                    // For bootloader, use Internal Flash interface (0x08000000)
-                    selectedInterface = interfaces.find(ifc => ifc.name && ifc.name.includes("0x08000000"));
-                    if (!selectedInterface) {
-                        console.log("No interface with 0x08000000 found, using first interface");
-                        selectedInterface = interfaces[0];
-                    }
-                } else {
-                    // For firmware, use QSPI interface (0x90000000)
-                    selectedInterface = interfaces.find(ifc => ifc.name && ifc.name.includes("0x90000000"));
-                    if (!selectedInterface) {
-                        console.log("No interface with 0x90000000 found, using first interface");
-                        selectedInterface = interfaces[0];
-                    }
-                }
-
-                console.log(`Selected interface: ${selectedInterface.name || 'unnamed'}`);
-                console.log(`Interface number: ${selectedInterface.interface.interfaceNumber}`);
-                console.log(`Alternate setting: ${selectedInterface.alternate.alternateSetting}`);
-
-                // Create the appropriate device type
-                if (currentMode === 'bootloader') {
-                    // Standard DFU for internal flash
-                    dfuDevice = new dfu.Device(selectedDevice, selectedInterface);
-                    console.log('[BOOTLOADER] Created standard DFU device for internal flash');
-                } else {
-                    // DfuSe for QSPI flash
-                    dfuDevice = new dfuse.Device(selectedDevice, selectedInterface);
-                    // Set start address for QSPI firmware
-                    dfuDevice.startAddress = 0x90040000;
-                    console.log('[FIRMWARE] Created DfuSe device for QSPI flash at 0x90040000');
-                }
-
-                console.log('[DEVICE] Opening device and selecting alternate interface...');
-                await dfuDevice.open();
-                console.log('[DEVICE] Device opened successfully, alternate interface selected');
-
-                // Upload the binary
-                const TRANSFER_SIZE = 2048;
-                updateStatus('Uploading binary...', 'info');
-
-                await dfuDevice.do_download(TRANSFER_SIZE, new Uint8Array(binary), false);
-
-                await dfuDevice.close();
-
-                // If we just installed bootloader, now upload firmware
-                if (needsFirmwareAfterBootloader) {
-                    await handleFirmwareAfterBootloader();
-                } else {
-                    // Single upload complete
-                    goToStep(4);
-                    const msg = currentMode === 'firmware'
-                        ? '🎵 Firmware updated! Your HiChord is ready to play!'
-                        : '🎉 Setup complete! Your HiChord is ready to play!';
-                    document.getElementById('completeMessage').textContent = msg;
-                }
-
-            } catch (error) {
-                updateStatus('❌ Error: ' + error, 'error');
-                console.error(error);
-            }
-        }
-
-        async function handleFirmwareAfterBootloader() {
-            // Load firmware
-            currentMode = 'firmware';
-            goToStep(2);
-
-            try {
-                const response = await fetch(FIRMWARE_PATH);
-                if (!response.ok) throw new Error('File not found: ' + FIRMWARE_PATH);
-                binary = await response.arrayBuffer();
-                console.log(`Loaded firmware: ${(binary.byteLength / 1024).toFixed(1)} KB`);
-            } catch (error) {
-                updateStatus('❌ Failed to load firmware file: ' + error.message, 'error');
-                return;
-            }
-
-            document.getElementById('dfu-instructions').innerHTML = `
-                <h3>Enter Daisy Bootloader Mode</h3>
-                <ul class="instruction-list">
-                    <li><strong>Status:</strong> Bootloader installed successfully!</li>
-                    <li>Press the <strong>RESET</strong> button (short press)</li>
-                    <li>Within 2 seconds, press <strong>BOOT</strong> button</li>
-                    <li>LED should pulse (Daisy bootloader active)</li>
-                </ul>
-                <p style="color: #6b7280; font-size: 13px; margin-top: 12px;"><em>Now we'll upload the HiChord firmware to QSPI flash.</em></p>
-            `;
-
-            document.getElementById('connectButton').textContent = 'Connect & Upload Firmware';
-            needsFirmwareAfterBootloader = false;
-        }
-
-        function updateStatus(message, type) {
-            const el = document.getElementById('statusMessage');
-            el.textContent = message;
-            el.className = 'status-message show ' + type;
-        }
-
-        window.addEventListener('load', () => {
-            if (!navigator.usb) {
-                alert('⚠️ WebUSB not supported. Please use Chrome or Edge browser.');
-            }
-        });
-    </script>
+    <!-- Load DFU libraries in exact Electro-Smith order -->
+    <script src="dfu/dfu.js"></script>
+    <script src="dfu/dfuse.js"></script>
+    <script src="app/dfu-util.js"></script>
 </body>
 </html>
