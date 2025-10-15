@@ -5,60 +5,77 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>HiChord Uploader</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-
         * {
             margin: 0;
             padding: 0;
             box-sizing: border-box;
         }
 
+        :root {
+            --black: #0A0A0A;
+            --white: #FAFAFA;
+            --gray: #6B6B6B;
+            --light-gray: #DADADA;
+            --lighter-gray: #F2F2F2;
+            --lightest-gray: #F8F8F8;
+            --accent: #FF6B35;
+            --accent-hover: #E85A28;
+            --accent-light: #FFF4F0;
+            --success: #10b981;
+            --warning: #FFB800;
+            --danger: #ef4444;
+            --border-light: #E5E7EB;
+            --border-medium: #D1D5DB;
+        }
+
         body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'SF Pro Display', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+            background: var(--white);
+            color: var(--black);
+            line-height: 1.65;
+            padding: 40px 20px;
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
+            font-size: 15px;
+            font-weight: 400;
+            letter-spacing: -0.011em;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .container {
-            max-width: 600px;
+            max-width: 720px;
             width: 100%;
-            background: white;
-            border-radius: 20px;
-            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-            overflow: hidden;
+            margin: 0 auto;
         }
 
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 40px 30px;
-            text-align: center;
+            border-bottom: 1px solid var(--border-light);
+            padding-bottom: 20px;
+            margin-bottom: 40px;
         }
 
         .header h1 {
-            font-size: 28px;
-            font-weight: 700;
+            font-size: 48px;
+            font-weight: 600;
+            letter-spacing: -1.2px;
+            color: var(--black);
+            text-transform: uppercase;
             margin-bottom: 8px;
         }
 
         .header p {
-            font-size: 14px;
-            opacity: 0.9;
-        }
-
-        .content {
-            padding: 40px 30px;
+            font-size: 11px;
+            color: var(--gray);
+            text-transform: uppercase;
+            letter-spacing: 1.8px;
+            font-weight: 500;
         }
 
         .step {
-            margin-bottom: 40px;
-            opacity: 0.4;
+            margin-bottom: 48px;
+            opacity: 0.35;
             pointer-events: none;
-            transition: all 0.3s;
+            transition: opacity 0.3s ease;
         }
 
         .step.active {
@@ -66,138 +83,160 @@
             pointer-events: auto;
         }
 
+        .step.complete {
+            opacity: 0.6;
+        }
+
         .step-header {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .step-number {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            background: #f0f0f0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            font-size: 18px;
-            color: #666;
-            margin-right: 15px;
-        }
-
-        .step.active .step-number {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-        }
-
-        .step.complete .step-number {
-            background: #10b981;
-            color: white;
-        }
-
-        .step.complete .step-number::before {
-            content: "✓";
-        }
-
-        .step-title {
-            font-size: 20px;
+            font-size: 22px;
             font-weight: 600;
-            color: #1f2937;
+            margin-bottom: 24px;
+            padding: 16px 20px;
+            padding-left: 34px;
+            letter-spacing: 0.5px;
+            color: var(--black);
+            border-left: 4px solid var(--light-gray);
+            background: linear-gradient(90deg, var(--lightest-gray) 0%, transparent 100%);
+            text-transform: uppercase;
+            border-radius: 0 4px 4px 0;
+            transition: all 0.3s ease;
+        }
+
+        .step.active .step-header {
+            border-left-color: var(--accent);
+            background: linear-gradient(90deg, var(--accent-light) 0%, transparent 100%);
+        }
+
+        .step.complete .step-header {
+            border-left-color: var(--success);
+            background: linear-gradient(90deg, #d1fae5 0%, transparent 100%);
         }
 
         .step-content {
-            margin-left: 55px;
+            padding-left: 34px;
         }
 
         .instruction-box {
-            background: #f9fafb;
-            border: 2px solid #e5e7eb;
-            border-radius: 12px;
-            padding: 20px;
-            margin-bottom: 20px;
+            border-left: 4px solid var(--accent);
+            padding: 20px 24px;
+            margin: 24px 0;
+            background: var(--accent-light);
+            border-radius: 0 6px 6px 0;
+            border: 1px solid var(--border-light);
+            border-left: 4px solid var(--accent);
         }
 
         .instruction-box.warning {
-            background: #fef3c7;
-            border-color: #fbbf24;
+            border-left-color: var(--warning);
+            background: #FFF9E6;
+        }
+
+        .instruction-box.success {
+            border-left-color: var(--success);
+            background: #d1fae5;
         }
 
         .instruction-box h3 {
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 600;
-            color: #1f2937;
+            color: var(--black);
             margin-bottom: 12px;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1.2px;
         }
 
         .instruction-list {
             list-style: none;
             padding: 0;
+            margin: 0;
         }
 
         .instruction-list li {
-            padding: 8px 0;
-            color: #4b5563;
-            font-size: 15px;
-            display: flex;
-            align-items: flex-start;
+            padding: 10px 0;
+            color: var(--black);
+            font-size: 14px;
+            line-height: 1.6;
+            border-bottom: 1px solid var(--border-light);
         }
 
-        .instruction-list li::before {
-            content: "→";
-            margin-right: 12px;
-            color: #667eea;
-            font-weight: bold;
+        .instruction-list li:last-child {
+            border-bottom: none;
+        }
+
+        .instruction-list li strong {
+            font-weight: 600;
+            color: var(--black);
         }
 
         .big-button {
             width: 100%;
-            padding: 18px;
-            border: none;
-            border-radius: 12px;
-            font-size: 16px;
+            padding: 16px 24px;
+            border: 2px solid var(--black);
+            background: var(--black);
+            color: var(--white);
+            border-radius: 0;
+            font-size: 13px;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: all 0.15s ease;
             text-transform: uppercase;
-            letter-spacing: 0.5px;
+            letter-spacing: 1.5px;
+            font-family: inherit;
+        }
+
+        .big-button:hover:not(:disabled) {
+            background: var(--white);
+            color: var(--black);
+            border-color: var(--black);
         }
 
         .big-button:disabled {
-            opacity: 0.5;
+            opacity: 0.3;
             cursor: not-allowed;
         }
 
         .big-button.primary {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--white);
         }
 
         .big-button.primary:hover:not(:disabled) {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+            background: var(--accent-hover);
+            border-color: var(--accent-hover);
         }
 
         .big-button.success {
-            background: #10b981;
-            color: white;
+            background: var(--success);
+            border-color: var(--success);
+            color: var(--white);
+        }
+
+        .big-button.success:hover:not(:disabled) {
+            background: #059669;
+            border-color: #059669;
         }
 
         .big-button.warning {
-            background: #f59e0b;
-            color: white;
+            background: var(--warning);
+            border-color: var(--warning);
+            color: var(--black);
+        }
+
+        .big-button.warning:hover:not(:disabled) {
+            background: #F5A500;
+            border-color: #F5A500;
         }
 
         .progress-bar {
             width: 100%;
-            height: 8px;
-            background: #e5e7eb;
-            border-radius: 4px;
+            height: 3px;
+            background: var(--border-light);
+            border-radius: 0;
             overflow: hidden;
-            margin: 20px 0;
+            margin: 24px 0;
             display: none;
+            border: 1px solid var(--border-light);
         }
 
         .progress-bar.show {
@@ -206,18 +245,20 @@
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            background: var(--accent);
             width: 0%;
-            transition: width 0.3s;
+            transition: width 0.3s ease;
         }
 
         .status-message {
-            text-align: center;
-            padding: 15px;
-            border-radius: 8px;
+            padding: 16px 20px;
             margin: 20px 0;
-            font-weight: 600;
+            font-weight: 500;
+            font-size: 13px;
+            letter-spacing: 0.3px;
             display: none;
+            border-left: 4px solid;
+            border-radius: 0 4px 4px 0;
         }
 
         .status-message.show {
@@ -227,42 +268,50 @@
         .status-message.success {
             background: #d1fae5;
             color: #065f46;
+            border-left-color: var(--success);
         }
 
         .status-message.error {
             background: #fee2e2;
             color: #991b1b;
+            border-left-color: var(--danger);
         }
 
         .status-message.info {
-            background: #dbeafe;
-            color: #1e40af;
+            background: var(--lightest-gray);
+            color: var(--black);
+            border-left-color: var(--gray);
         }
 
         .tab-selector {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 24px;
         }
 
         .tab {
-            flex: 1;
-            padding: 12px;
-            background: #f3f4f6;
-            border: 2px solid transparent;
-            border-radius: 8px;
+            padding: 16px 24px;
+            background: var(--white);
+            border: 2px solid var(--border-light);
             text-align: center;
             cursor: pointer;
             font-weight: 600;
-            font-size: 14px;
-            color: #6b7280;
-            transition: all 0.2s;
+            font-size: 13px;
+            color: var(--gray);
+            transition: all 0.15s ease;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+        }
+
+        .tab:hover {
+            border-color: var(--border-medium);
         }
 
         .tab.active {
-            background: white;
-            border-color: #667eea;
-            color: #667eea;
+            background: var(--black);
+            border-color: var(--black);
+            color: var(--white);
         }
 
         .tab-content {
@@ -273,111 +322,108 @@
             display: block;
         }
 
-        .icon {
-            font-size: 48px;
-            text-align: center;
-            margin: 20px 0;
+        @media (max-width: 640px) {
+            body {
+                padding: 20px 16px;
+            }
+
+            .header h1 {
+                font-size: 36px;
+            }
+
+            .step-content {
+                padding-left: 20px;
+            }
+
+            .step-header {
+                font-size: 18px;
+                padding-left: 24px;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎵 HiChord Uploader</h1>
-            <p>Simple firmware & bootloader installation</p>
+            <h1>HiChord</h1>
+            <p>Firmware Uploader // Web DFU</p>
         </div>
 
-        <div class="content">
-            <!-- STEP 1: Choose Path -->
-            <div class="step active" id="step1">
-                <div class="step-header">
-                    <div class="step-number">1</div>
-                    <div class="step-title">What do you have?</div>
-                </div>
-                <div class="step-content">
-                    <div class="tab-selector">
-                        <div class="tab active" onclick="selectDevice('fresh')">
-                            🆕 New Daisy Seed
-                        </div>
-                        <div class="tab" onclick="selectDevice('hichord')">
-                            🎹 HiChord Device
-                        </div>
+        <!-- STEP 1: Choose Path -->
+        <div class="step active" id="step1">
+            <div class="step-header">01 // Select Device Type</div>
+            <div class="step-content">
+                <div class="tab-selector">
+                    <div class="tab active" onclick="selectDevice('fresh')">
+                        Blank Daisy Seed
                     </div>
-
-                    <div class="tab-content active" id="fresh-content">
-                        <div class="instruction-box warning">
-                            <h3>⚡ First-Time Setup Required</h3>
-                            <p style="color: #92400e; font-size: 14px; line-height: 1.6;">
-                                Your new Daisy Seed needs a bootloader installed first. This is a one-time setup.
-                            </p>
-                        </div>
-                        <button class="big-button warning" onclick="startBootloaderInstall()">
-                            Install Bootloader First →
-                        </button>
-                    </div>
-
-                    <div class="tab-content" id="hichord-content">
-                        <div class="instruction-box">
-                            <h3>✅ Ready to Update</h3>
-                            <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
-                                Your HiChord already has a bootloader. You can update the firmware directly.
-                            </p>
-                        </div>
-                        <button class="big-button primary" onclick="startFirmwareUpdate()">
-                            Update Firmware →
-                        </button>
+                    <div class="tab" onclick="selectDevice('hichord')">
+                        Update HiChord
                     </div>
                 </div>
-            </div>
 
-            <!-- STEP 2: Enter DFU Mode -->
-            <div class="step" id="step2">
-                <div class="step-header">
-                    <div class="step-number">2</div>
-                    <div class="step-title">Connect Your Device</div>
-                </div>
-                <div class="step-content">
-                    <div class="instruction-box" id="dfu-instructions">
-                        <!-- Instructions will be inserted here -->
+                <div class="tab-content active" id="fresh-content">
+                    <div class="instruction-box warning">
+                        <h3>First-Time Setup Required</h3>
+                        <p style="font-size: 14px; line-height: 1.6;">
+                            Blank Daisy Seeds require bootloader installation followed by firmware upload. This process will install both automatically.
+                        </p>
                     </div>
-                    <div class="icon">🔌</div>
-                    <button class="big-button primary" id="connectButton" onclick="connectAndUpload()">
-                        Connect & Upload
+                    <button class="big-button warning" onclick="startBootloaderInstall()">
+                        Install Bootloader + Firmware
+                    </button>
+                </div>
+
+                <div class="tab-content" id="hichord-content">
+                    <div class="instruction-box success">
+                        <h3>Firmware Update</h3>
+                        <p style="font-size: 14px; line-height: 1.6;">
+                            For existing HiChord devices. Updates only the firmware using the Fn1+Fn2+Fn3 menu command.
+                        </p>
+                    </div>
+                    <button class="big-button primary" onclick="startFirmwareUpdate()">
+                        Update Firmware Only
                     </button>
                 </div>
             </div>
+        </div>
 
-            <!-- STEP 3: Upload Progress -->
-            <div class="step" id="step3">
-                <div class="step-header">
-                    <div class="step-number">3</div>
-                    <div class="step-title">Uploading...</div>
+        <!-- STEP 2: Enter DFU Mode -->
+        <div class="step" id="step2">
+            <div class="step-header">02 // Enter DFU Mode</div>
+            <div class="step-content">
+                <div class="instruction-box" id="dfu-instructions">
+                    <!-- Instructions will be inserted here -->
                 </div>
-                <div class="step-content">
-                    <div class="progress-bar show">
-                        <div class="progress-fill" id="progressFill"></div>
-                    </div>
-                    <div class="status-message show info" id="statusMessage">
-                        Preparing upload...
-                    </div>
+                <button class="big-button primary" id="connectButton" onclick="connectAndUpload()">
+                    Connect & Upload
+                </button>
+            </div>
+        </div>
+
+        <!-- STEP 3: Upload Progress -->
+        <div class="step" id="step3">
+            <div class="step-header">03 // Upload Progress</div>
+            <div class="step-content">
+                <div class="progress-bar show">
+                    <div class="progress-fill" id="progressFill"></div>
+                </div>
+                <div class="status-message show info" id="statusMessage">
+                    Preparing upload...
                 </div>
             </div>
+        </div>
 
-            <!-- STEP 4: Complete -->
-            <div class="step" id="step4">
-                <div class="step-header">
-                    <div class="step-number">4</div>
-                    <div class="step-title">All Done!</div>
+        <!-- STEP 4: Complete -->
+        <div class="step" id="step4">
+            <div class="step-header">04 // Complete</div>
+            <div class="step-content">
+                <div class="status-message show success" id="completeMessage">
+                    <!-- Success message will be inserted here -->
                 </div>
-                <div class="step-content">
-                    <div class="icon">✨</div>
-                    <div class="status-message show success" id="completeMessage">
-                        <!-- Success message will be inserted here -->
-                    </div>
-                    <button class="big-button success" onclick="location.reload()">
-                        Upload More Devices
-                    </button>
-                </div>
+                <button class="big-button success" onclick="location.reload()">
+                    Upload Another Device
+                </button>
             </div>
         </div>
     </div>
