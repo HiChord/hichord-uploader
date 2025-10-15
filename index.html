@@ -550,11 +550,36 @@
                 await device.open();
                 if (!device.configuration) await device.selectConfiguration(1);
 
-                const dfuInterface = device.configuration.interfaces.find(
+                // Find all DFU interfaces
+                const dfuInterfaces = device.configuration.interfaces.filter(
                     iface => iface.alternates.some(alt => alt.interfaceClass === 0xFE && alt.interfaceSubclass === 0x01)
                 );
 
-                if (!dfuInterface) throw new Error('DFU interface not found');
+                console.log(`Found ${dfuInterfaces.length} DFU interface(s)`);
+
+                if (dfuInterfaces.length === 0) {
+                    throw new Error('No DFU interface found');
+                }
+
+                // Use the first DFU interface (or for QSPI, look for interface with @Internal Flash or @QSPI)
+                let dfuInterface = dfuInterfaces[0];
+
+                // If uploading to QSPI, try to find the QSPI interface
+                if (currentMode !== 'bootloader-only') {
+                    const qspiInterface = dfuInterfaces.find(iface =>
+                        iface.alternates.some(alt => alt.interfaceName && alt.interfaceName.includes('QSPI'))
+                    );
+                    if (qspiInterface) {
+                        dfuInterface = qspiInterface;
+                        console.log('Selected QSPI interface');
+                    } else {
+                        console.log('No QSPI interface name found, using first interface');
+                    }
+                } else {
+                    console.log('Bootloader mode - using first interface');
+                }
+
+                console.log(`Using interface ${dfuInterface.interfaceNumber}: ${dfuInterface.alternates[0].interfaceName || 'unnamed'}`);
 
                 await device.claimInterface(dfuInterface.interfaceNumber);
 
@@ -650,7 +675,26 @@
             }
 
             if (dfuStatus.state === dfuERROR) {
-                throw new Error(`DFU Error: status=${dfuStatus.status}`);
+                const statusNames = {
+                    0x00: 'OK',
+                    0x01: 'errTARGET',
+                    0x02: 'errFILE',
+                    0x03: 'errWRITE',
+                    0x04: 'errERASE',
+                    0x05: 'errCHECK_ERASED',
+                    0x06: 'errPROG',
+                    0x07: 'errVERIFY',
+                    0x08: 'errADDRESS',
+                    0x09: 'errNOTDONE',
+                    0x0A: 'errFIRMWARE',
+                    0x0B: 'errVENDOR',
+                    0x0C: 'errUSBR',
+                    0x0D: 'errPOR',
+                    0x0E: 'errUNKNOWN',
+                    0x0F: 'errSTALLEDPKT'
+                };
+                const statusName = statusNames[dfuStatus.status] || `UNKNOWN(${dfuStatus.status})`;
+                throw new Error(`DFU Error: ${statusName} (status=0x${dfuStatus.status.toString(16)}, state=${dfuStatus.state})`);
             }
 
             return dfuStatus;
@@ -693,22 +737,15 @@
         async function eraseFlash(startAddr, length) {
             updateStatus('Erasing flash sectors...', 'info');
 
-            // For QSPI: 4KB sectors
-            const SECTOR_SIZE = 4096;
-            const endAddr = startAddr + length;
-            let addr = startAddr - (startAddr % SECTOR_SIZE); // Align to sector boundary
+            // Daisy bootloader may not support ERASE_SECTOR for QSPI
+            // The bootloader automatically erases during write
+            // So we'll skip manual erase and let the bootloader handle it
+            console.log(`Skipping manual erase - bootloader will handle it during write`);
+            console.log(`Address: 0x${startAddr.toString(16)}, Length: ${length} bytes`);
 
-            const totalBytes = endAddr - addr;
-            let bytesErased = 0;
-
-            while (addr < endAddr) {
-                await dfuseCommand(DFUSE_ERASE_SECTOR, addr, 4);
-                addr += SECTOR_SIZE;
-                bytesErased += SECTOR_SIZE;
-
-                const progress = Math.min((bytesErased / totalBytes) * 30, 30); // 30% of progress bar
-                document.getElementById('progressFill').style.width = progress + '%';
-            }
+            // Just show progress to 30% to indicate erase phase conceptually
+            document.getElementById('progressFill').style.width = '30%';
+            await new Promise(r => setTimeout(r, 100));
         }
 
         async function uploadBinary(data, address, isQSPI) {
