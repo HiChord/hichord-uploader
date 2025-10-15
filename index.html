@@ -433,29 +433,588 @@
         const FIRMWARE_PATH = 'firmware/hichord_unified.bin';
         const BOOTLOADER_PATH = 'boot/dsy_bootloader_v6_2-extdfu-10ms.bin';
 
-        // DFU Constants
-        const DFU_DNLOAD = 0x01;
-        const DFU_GETSTATUS = 0x03;
-        const DFU_CLRSTATUS = 0x04;
-        const DFU_ABORT = 0x06;
+        // ========================================
+        // COMPLETE ELECTRO-SMITH DFU.JS IMPLEMENTATION
+        // ========================================
+        var dfu = {};
 
-        // DFU States
-        const dfuIDLE = 2;
-        const dfuDNLOAD_SYNC = 3;
-        const dfuDNBUSY = 4;
-        const dfuDNLOAD_IDLE = 5;
-        const dfuMANIFEST_SYNC = 6;
-        const dfuMANIFEST = 7;
-        const dfuMANIFEST_WAIT_RESET = 8;
-        const dfuERROR = 10;
+        (function() {
+            'use strict';
 
-        // DfuSe Commands
-        const DFUSE_SET_ADDRESS = 0x21;
-        const DFUSE_ERASE_SECTOR = 0x41;
+            dfu.DETACH = 0x00;
+            dfu.DNLOAD = 0x01;
+            dfu.UPLOAD = 0x02;
+            dfu.GETSTATUS = 0x03;
+            dfu.CLRSTATUS = 0x04;
+            dfu.GETSTATE = 0x05;
+            dfu.ABORT = 6;
+
+            dfu.appIDLE = 0;
+            dfu.appDETACH = 1;
+            dfu.dfuIDLE = 2;
+            dfu.dfuDNLOAD_SYNC = 3;
+            dfu.dfuDNBUSY = 4;
+            dfu.dfuDNLOAD_IDLE = 5;
+            dfu.dfuMANIFEST_SYNC = 6;
+            dfu.dfuMANIFEST = 7;
+            dfu.dfuMANIFEST_WAIT_RESET = 8;
+            dfu.dfuUPLOAD_IDLE = 9;
+            dfu.dfuERROR = 10;
+
+            dfu.STATUS_OK = 0x0;
+
+            dfu.Device = function(device, settings) {
+                this.device_ = device;
+                this.settings = settings;
+                this.intfNumber = settings["interface"].interfaceNumber;
+            };
+
+            dfu.findDeviceDfuInterfaces = function(device) {
+                let interfaces = [];
+                for (let conf of device.configurations) {
+                    for (let intf of conf.interfaces) {
+                        for (let alt of intf.alternates) {
+                            if (alt.interfaceClass == 0xFE &&
+                                alt.interfaceSubclass == 0x01 &&
+                                (alt.interfaceProtocol == 0x01 || alt.interfaceProtocol == 0x02)) {
+                                let settings = {
+                                    "configuration": conf,
+                                    "interface": intf,
+                                    "alternate": alt,
+                                    "name": alt.interfaceName
+                                };
+                                interfaces.push(settings);
+                            }
+                        }
+                    }
+                }
+
+                return interfaces;
+            }
+
+            dfu.Device.prototype.logDebug = function(msg) {
+                console.log(msg);
+            };
+
+            dfu.Device.prototype.logInfo = function(msg) {
+                console.log(msg);
+                updateStatus(msg, 'info');
+            };
+
+            dfu.Device.prototype.logWarning = function(msg) {
+                console.log(msg);
+            };
+
+            dfu.Device.prototype.logError = function(msg) {
+                console.log(msg);
+            };
+
+            dfu.Device.prototype.logProgress = function(done, total) {
+                if (typeof total === 'undefined') {
+                    console.log(done)
+                } else {
+                    const percent = (done / total) * 100;
+                    document.getElementById('progressFill').style.width = percent + '%';
+                    console.log(done + '/' + total);
+                }
+            };
+
+            dfu.Device.prototype.open = async function() {
+                await this.device_.open();
+                const confValue = this.settings.configuration.configurationValue;
+                if (this.device_.configuration === null ||
+                    this.device_.configuration.configurationValue != confValue) {
+                    await this.device_.selectConfiguration(confValue);
+                }
+
+                const intfNumber = this.settings["interface"].interfaceNumber;
+                if (!this.device_.configuration.interfaces[intfNumber].claimed) {
+                    await this.device_.claimInterface(intfNumber);
+                }
+
+                const altSetting = this.settings.alternate.alternateSetting;
+                let intf = this.device_.configuration.interfaces[intfNumber];
+                if (intf.alternate === null ||
+                    intf.alternate.alternateSetting != altSetting) {
+                    await this.device_.selectAlternateInterface(intfNumber, altSetting);
+                }
+            }
+
+            dfu.Device.prototype.close = async function() {
+                try {
+                    await this.device_.close();
+                } catch (error) {
+                    console.log(error);
+                }
+            };
+
+            dfu.Device.prototype.requestOut = function(bRequest, data, wValue=0) {
+                return this.device_.controlTransferOut({
+                    "requestType": "class",
+                    "recipient": "interface",
+                    "request": bRequest,
+                    "value": wValue,
+                    "index": this.intfNumber
+                }, data).then(
+                    result => {
+                        if (result.status == "ok") {
+                            return Promise.resolve(result.bytesWritten);
+                        } else {
+                            return Promise.reject(result.status);
+                        }
+                    },
+                    error => {
+                        return Promise.reject("ControlTransferOut failed: " + error);
+                    }
+                );
+            };
+
+            dfu.Device.prototype.requestIn = function(bRequest, wLength, wValue=0) {
+                return this.device_.controlTransferIn({
+                    "requestType": "class",
+                    "recipient": "interface",
+                    "request": bRequest,
+                    "value": wValue,
+                    "index": this.intfNumber
+                }, wLength).then(
+                    result => {
+                        if (result.status == "ok") {
+                            return Promise.resolve(result.data);
+                        } else {
+                            return Promise.reject(result.status);
+                        }
+                    },
+                    error => {
+                        return Promise.reject("ControlTransferIn failed: " + error);
+                    }
+                );
+            };
+
+            dfu.Device.prototype.download = function(data, blockNum) {
+                return this.requestOut(dfu.DNLOAD, data, blockNum);
+            };
+
+            dfu.Device.prototype.dnload = dfu.Device.prototype.download;
+
+            dfu.Device.prototype.clearStatus = function() {
+                return this.requestOut(dfu.CLRSTATUS);
+            };
+
+            dfu.Device.prototype.clrStatus = dfu.Device.prototype.clearStatus;
+
+            dfu.Device.prototype.getStatus = function() {
+                return this.requestIn(dfu.GETSTATUS, 6).then(
+                    data =>
+                        Promise.resolve({
+                            "status": data.getUint8(0),
+                            "pollTimeout": data.getUint32(1, true) & 0xFFFFFF,
+                            "state": data.getUint8(4)
+                        }),
+                    error =>
+                        Promise.reject("DFU GETSTATUS failed: " + error)
+                );
+            };
+
+            dfu.Device.prototype.getState = function() {
+                return this.requestIn(dfu.GETSTATE, 1).then(
+                    data => Promise.resolve(data.getUint8(0)),
+                    error => Promise.reject("DFU GETSTATE failed: " + error)
+                );
+            };
+
+            dfu.Device.prototype.abort = function() {
+                return this.requestOut(dfu.ABORT);
+            };
+
+            dfu.Device.prototype.abortToIdle = async function() {
+                await this.abort();
+                let state = await this.getState();
+                if (state == dfu.dfuERROR) {
+                    await this.clearStatus();
+                    state = await this.getState();
+                }
+                if (state != dfu.dfuIDLE) {
+                    throw "Failed to return to idle state after abort: state " + state.state;
+                }
+            };
+
+            dfu.Device.prototype.poll_until = async function(state_predicate) {
+                let dfu_status = await this.getStatus();
+
+                let device = this;
+                function async_sleep(duration_ms) {
+                    return new Promise(function(resolve, reject) {
+                        device.logDebug("Sleeping for " + duration_ms + "ms");
+                        setTimeout(resolve, duration_ms);
+                    });
+                }
+
+                while (!state_predicate(dfu_status.state) && dfu_status.state != dfu.dfuERROR) {
+                    await async_sleep(dfu_status.pollTimeout);
+                    dfu_status = await this.getStatus();
+                }
+
+                return dfu_status;
+            };
+
+            dfu.Device.prototype.poll_until_idle = function(idle_state) {
+                return this.poll_until(state => (state == idle_state));
+            };
+
+            dfu.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant) {
+                let bytes_sent = 0;
+                let expected_size = data.byteLength;
+                let transaction = 0;
+
+                this.logInfo("Copying data from browser to DFU device");
+
+                // Initialize progress to 0
+                this.logProgress(bytes_sent, expected_size);
+
+                while (bytes_sent < expected_size) {
+                    const bytes_left = expected_size - bytes_sent;
+                    const chunk_size = Math.min(bytes_left, xfer_size);
+
+                    let bytes_written = 0;
+                    let dfu_status;
+                    try {
+                        bytes_written = await this.download(data.slice(bytes_sent, bytes_sent+chunk_size), transaction++);
+                        this.logDebug("Sent " + bytes_written + " bytes");
+                        dfu_status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
+                    } catch (error) {
+                        throw "Error during DFU download: " + error;
+                    }
+
+                    if (dfu_status.status != dfu.STATUS_OK) {
+                        throw `DFU DOWNLOAD failed state=${dfu_status.state}, status=${dfu_status.status}`;
+                    }
+
+                    this.logDebug("Wrote " + bytes_written + " bytes");
+                    bytes_sent += bytes_written;
+
+                    this.logProgress(bytes_sent, expected_size);
+                }
+
+                this.logDebug("Sending empty block");
+                try {
+                    await this.download(new ArrayBuffer([]), transaction++);
+                } catch (error) {
+                    throw "Error during final DFU download: " + error;
+                }
+
+                this.logInfo("Wrote " + bytes_sent + " bytes");
+                this.logInfo("Manifesting new firmware");
+
+                if (manifestationTolerant) {
+                    // Transition to MANIFEST_SYNC state
+                    let dfu_status;
+                    try {
+                        // Wait until it returns to idle.
+                        // If it's not really manifestation tolerant, it might transition to MANIFEST_WAIT_RESET
+                        dfu_status = await this.poll_until(state => (state == dfu.dfuIDLE || state == dfu.dfuMANIFEST_WAIT_RESET));
+                        if (dfu_status.state == dfu.dfuMANIFEST_WAIT_RESET) {
+                            this.logDebug("Device transitioned to MANIFEST_WAIT_RESET even though it is manifestation tolerant");
+                        }
+                        if (dfu_status.status != dfu.STATUS_OK) {
+                            throw `DFU MANIFEST failed state=${dfu_status.state}, status=${dfu_status.status}`;
+                        }
+                    } catch (error) {
+                        if (error.endsWith("ControlTransferIn failed: NotFoundError: Device unavailable.") ||
+                            error.endsWith("ControlTransferIn failed: NotFoundError: The device was disconnected.")) {
+                            this.logWarning("Unable to poll final manifestation status");
+                        } else {
+                            throw "Error during DFU manifest: " + error;
+                        }
+                    }
+                } else {
+                    // Try polling once to initiate manifestation
+                    try {
+                        let final_status = await this.getStatus();
+                        this.logDebug(`Final DFU status: state=${final_status.state}, status=${final_status.status}`);
+                    } catch (error) {
+                        this.logDebug("Manifest GET_STATUS poll error: " + error);
+                    }
+                }
+
+                // Reset to exit MANIFEST_WAIT_RESET
+                try {
+                    await this.device_.reset();
+                } catch (error) {
+                    if (error == "NetworkError: Unable to reset the device." ||
+                        error == "NotFoundError: Device unavailable." ||
+                        error == "NotFoundError: The device was disconnected.") {
+                        this.logDebug("Ignored reset error");
+                    } else {
+                        throw "Error during reset for manifestation: " + error;
+                    }
+                }
+
+                return;
+            };
+        })();
+
+        // ========================================
+        // COMPLETE ELECTRO-SMITH DFUSE.JS IMPLEMENTATION
+        // ========================================
+        var dfuse = {};
+
+        (function() {
+            'use strict';
+
+            dfuse.GET_COMMANDS = 0x00;
+            dfuse.SET_ADDRESS = 0x21;
+            dfuse.ERASE_SECTOR = 0x41;
+
+            dfuse.Device = function(device, settings) {
+                dfu.Device.call(this, device, settings);
+                this.memoryInfo = null;
+                this.startAddress = NaN;
+                if (settings.name) {
+                    this.memoryInfo = dfuse.parseMemoryDescriptor(settings.name);
+                }
+            }
+
+            dfuse.Device.prototype = Object.create(dfu.Device.prototype);
+            dfuse.Device.prototype.constructor = dfuse.Device;
+
+            dfuse.parseMemoryDescriptor = function(desc) {
+                const nameEndIndex = desc.indexOf("/");
+                if (!desc.startsWith("@") || nameEndIndex == -1) {
+                    throw `Not a DfuSe memory descriptor: "${desc}"`;
+                }
+
+                const name = desc.substring(1, nameEndIndex).trim();
+                const segmentString = desc.substring(nameEndIndex);
+
+                let segments = [];
+
+                const sectorMultipliers = {
+                    ' ': 1,
+                    'B': 1,
+                    'K': 1024,
+                    'M': 1048576
+                };
+
+                let contiguousSegmentRegex = /\/\s*(0x[0-9a-fA-F]{1,8})\s*\/(\s*[0-9]+\s*\*\s*[0-9]+\s?[ BKM]\s*[abcdefg]\s*,?\s*)+/g;
+                let contiguousSegmentMatch;
+                while (contiguousSegmentMatch = contiguousSegmentRegex.exec(segmentString)) {
+                    let segmentRegex = /([0-9]+)\s*\*\s*([0-9]+)\s?([ BKM])\s*([abcdefg])\s*,?\s*/g;
+                    let startAddress = parseInt(contiguousSegmentMatch[1], 16);
+                    let segmentMatch;
+                    while (segmentMatch = segmentRegex.exec(contiguousSegmentMatch[0])) {
+                        let segment = {}
+                        let sectorCount = parseInt(segmentMatch[1], 10);
+                        let sectorSize = parseInt(segmentMatch[2]) * sectorMultipliers[segmentMatch[3]];
+                        let properties = segmentMatch[4].charCodeAt(0) - 'a'.charCodeAt(0) + 1;
+                        segment.start = startAddress;
+                        segment.sectorSize = sectorSize;
+                        segment.end = startAddress + sectorSize * sectorCount;
+                        segment.readable = (properties & 0x1) != 0;
+                        segment.erasable = (properties & 0x2) != 0;
+                        segment.writable = (properties & 0x4) != 0;
+                        segments.push(segment);
+
+                        startAddress += sectorSize * sectorCount;
+                    }
+                }
+
+                return {"name": name, "segments": segments};
+            };
+
+            dfuse.Device.prototype.dfuseCommand = async function(command, param, len) {
+                if (typeof param === 'undefined' && typeof len === 'undefined') {
+                    param = 0x00;
+                    len = 1;
+                }
+
+                const commandNames = {
+                    0x00: "GET_COMMANDS",
+                    0x21: "SET_ADDRESS",
+                    0x41: "ERASE_SECTOR"
+                };
+
+                let payload = new ArrayBuffer(len + 1);
+                let view = new DataView(payload);
+                view.setUint8(0, command);
+                if (len == 1) {
+                    view.setUint8(1, param);
+                } else if (len == 4) {
+                    view.setUint32(1, param, true);
+                } else {
+                    throw "Don't know how to handle data of len " + len;
+                }
+
+                try {
+                    await this.download(payload, 0);
+                } catch (error) {
+                    throw "Error during special DfuSe command " + commandNames[command] + ":" + error;
+                }
+
+                let status = await this.poll_until(state => (state != dfu.dfuDNBUSY));
+                if (status.status != dfu.STATUS_OK) {
+                    throw "Special DfuSe command " + commandNames[command] + " failed";
+                }
+            };
+
+            dfuse.Device.prototype.getSegment = function(addr) {
+                if (!this.memoryInfo || ! this.memoryInfo.segments) {
+                    throw "No memory map information available";
+                }
+
+                for (let segment of this.memoryInfo.segments) {
+                    if (segment.start <= addr && addr < segment.end) {
+                        return segment;
+                    }
+                }
+
+                return null;
+            };
+
+            dfuse.Device.prototype.getSectorStart = function(addr, segment) {
+                if (typeof segment === 'undefined') {
+                    segment = this.getSegment(addr);
+                }
+
+                if (!segment) {
+                    throw `Address ${addr.toString(16)} outside of memory map`;
+                }
+
+                const sectorIndex = Math.floor((addr - segment.start)/segment.sectorSize);
+                return segment.start + sectorIndex * segment.sectorSize;
+            };
+
+            dfuse.Device.prototype.getSectorEnd = function(addr, segment) {
+                if (typeof segment === 'undefined') {
+                    segment = this.getSegment(addr);
+                }
+
+                if (!segment) {
+                    throw `Address ${addr.toString(16)} outside of memory map`;
+                }
+
+                const sectorIndex = Math.floor((addr - segment.start)/segment.sectorSize);
+                return segment.start + (sectorIndex + 1) * segment.sectorSize;
+            };
+
+            dfuse.Device.prototype.getFirstWritableSegment = function() {
+                if (!this.memoryInfo || ! this.memoryInfo.segments) {
+                    throw "No memory map information available";
+                }
+
+                for (let segment of this.memoryInfo.segments) {
+                    if (segment.writable) {
+                        return segment;
+                    }
+                }
+
+                return null;
+            };
+
+            dfuse.Device.prototype.erase = async function(startAddr, length) {
+                let segment = this.getSegment(startAddr);
+                let addr = this.getSectorStart(startAddr, segment);
+                const endAddr = this.getSectorEnd(startAddr + length - 1);
+
+                let bytesErased = 0;
+                const bytesToErase = endAddr - addr;
+                if (bytesToErase > 0) {
+                    this.logProgress(bytesErased, bytesToErase);
+                }
+
+                while (addr < endAddr) {
+                    if (segment.end <= addr) {
+                        segment = this.getSegment(addr);
+                    }
+                    if (!segment.erasable) {
+                        // Skip over the non-erasable section
+                        bytesErased = Math.min(bytesErased + segment.end - addr, bytesToErase);
+                        addr = segment.end;
+                        this.logProgress(bytesErased, bytesToErase);
+                        continue;
+                    }
+                    const sectorIndex = Math.floor((addr - segment.start)/segment.sectorSize);
+                    const sectorAddr = segment.start + sectorIndex * segment.sectorSize;
+                    this.logDebug(`Erasing ${segment.sectorSize}B at 0x${sectorAddr.toString(16)}`);
+                    await this.dfuseCommand(dfuse.ERASE_SECTOR, sectorAddr, 4);
+                    addr = sectorAddr + segment.sectorSize;
+                    bytesErased += segment.sectorSize;
+                    this.logProgress(bytesErased, bytesToErase);
+                }
+            };
+
+            dfuse.Device.prototype.do_download = async function(xfer_size, data, manifestationTolerant) {
+                if (!this.memoryInfo || ! this.memoryInfo.segments) {
+                    throw "No memory map available";
+                }
+
+                this.logInfo("Erasing DFU device memory");
+
+                let bytes_sent = 0;
+                let expected_size = data.byteLength;
+
+                let startAddress = this.startAddress;
+                if (isNaN(startAddress)) {
+                    startAddress = this.memoryInfo.segments[0].start;
+                    this.logWarning("Using inferred start address 0x" + startAddress.toString(16));
+                } else if (this.getSegment(startAddress) === null) {
+                    this.logError(`Start address 0x${startAddress.toString(16)} outside of memory map bounds`);
+                }
+                await this.erase(startAddress, expected_size);
+
+                this.logInfo("Copying data from browser to DFU device");
+
+                let address = startAddress;
+                while (bytes_sent < expected_size) {
+                    const bytes_left = expected_size - bytes_sent;
+                    const chunk_size = Math.min(bytes_left, xfer_size);
+
+                    let bytes_written = 0;
+                    let dfu_status;
+                    try {
+                        await this.dfuseCommand(dfuse.SET_ADDRESS, address, 4);
+                        this.logDebug(`Set address to 0x${address.toString(16)}`);
+                        bytes_written = await this.download(data.slice(bytes_sent, bytes_sent+chunk_size), 2);
+                        this.logDebug("Sent " + bytes_written + " bytes");
+                        dfu_status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
+                        address += chunk_size;
+                    } catch (error) {
+                        throw "Error during DfuSe download: " + error;
+                    }
+
+                    if (dfu_status.status != dfu.STATUS_OK) {
+                        throw `DFU DOWNLOAD failed state=${dfu_status.state}, status=${dfu_status.status}`;
+                    }
+
+                    this.logDebug("Wrote " + bytes_written + " bytes");
+                    bytes_sent += bytes_written;
+
+                    this.logProgress(bytes_sent, expected_size);
+                }
+                this.logInfo(`Wrote ${bytes_sent} bytes`);
+
+                this.logInfo("Manifesting new firmware");
+                try {
+                    await this.dfuseCommand(dfuse.SET_ADDRESS, startAddress, 4);
+                    await this.download(new ArrayBuffer(), 0);
+                } catch (error) {
+                    throw "Error during DfuSe manifestation: " + error;
+                }
+
+                try {
+                    await this.poll_until(state => (state == dfu.dfuMANIFEST));
+                } catch (error) {
+                    this.logError(error);
+                }
+            }
+        })();
+
+        // ========================================
+        // HICHORD UPLOADER UI AND CONTROL
+        // ========================================
 
         // State
-        let currentMode = null; // 'bootloader-only', 'firmware-after-bootloader', 'firmware-only'
-        let device = null;
+        let currentMode = null; // 'bootloader', 'firmware'
+        let dfuDevice = null;
         let binary = null;
         let needsFirmwareAfterBootloader = false;
 
@@ -482,12 +1041,15 @@
         }
 
         async function startBootloaderInstall() {
-            currentMode = 'bootloader-only';
-            needsFirmwareAfterBootloader = true; // Will upload firmware after bootloader
+            currentMode = 'bootloader';
+            needsFirmwareAfterBootloader = true;
             goToStep(2);
 
             try {
-                binary = await loadBinary(BOOTLOADER_PATH);
+                const response = await fetch(BOOTLOADER_PATH);
+                if (!response.ok) throw new Error('File not found: ' + BOOTLOADER_PATH);
+                binary = await response.arrayBuffer();
+                console.log(`Loaded bootloader: ${(binary.byteLength / 1024).toFixed(1)} KB`);
             } catch (error) {
                 updateStatus('❌ Failed to load bootloader file: ' + error.message, 'error');
                 return;
@@ -507,12 +1069,15 @@
         }
 
         async function startFirmwareUpdate() {
-            currentMode = 'firmware-only';
+            currentMode = 'firmware';
             needsFirmwareAfterBootloader = false;
             goToStep(2);
 
             try {
-                binary = await loadBinary(FIRMWARE_PATH);
+                const response = await fetch(FIRMWARE_PATH);
+                if (!response.ok) throw new Error('File not found: ' + FIRMWARE_PATH);
+                binary = await response.arrayBuffer();
+                console.log(`Loaded firmware: ${(binary.byteLength / 1024).toFixed(1)} KB`);
             } catch (error) {
                 updateStatus('❌ Failed to load firmware file: ' + error.message, 'error');
                 return;
@@ -529,114 +1094,92 @@
             `;
         }
 
-        async function loadBinary(path) {
-            updateStatus('Loading binary file...', 'info');
-            const response = await fetch(path);
-            if (!response.ok) throw new Error('File not found: ' + path);
-            const data = await response.arrayBuffer();
-            updateStatus(`Loaded ${(data.byteLength / 1024).toFixed(1)} KB`, 'success');
-            return new Uint8Array(data);
-        }
-
         async function connectAndUpload() {
             try {
                 goToStep(3);
-                updateStatus('Connecting to device...', 'info');
+                updateStatus('Requesting DFU device...', 'info');
 
-                device = await navigator.usb.requestDevice({
+                const selectedDevice = await navigator.usb.requestDevice({
                     filters: [{ vendorId: 0x0483, productId: 0xdf11 }]
                 });
 
-                await device.open();
-                if (!device.configuration) await device.selectConfiguration(1);
+                // Find DFU interfaces
+                const interfaces = dfu.findDeviceDfuInterfaces(selectedDevice);
+                console.log(`Found ${interfaces.length} DFU interface(s)`);
 
-                // Find all DFU interfaces
-                const dfuInterfaces = device.configuration.interfaces.filter(
-                    iface => iface.alternates.some(alt => alt.interfaceClass === 0xFE && alt.interfaceSubclass === 0x01)
-                );
-
-                console.log(`Found ${dfuInterfaces.length} DFU interface(s)`);
-
-                if (dfuInterfaces.length === 0) {
+                if (interfaces.length === 0) {
                     throw new Error('No DFU interface found');
                 }
 
-                // Use the first DFU interface (or for QSPI, look for interface with @Internal Flash or @QSPI)
-                let dfuInterface = dfuInterfaces[0];
-
-                // Select the appropriate interface based on address
-                // For bootloader (0x08000000), use interface containing "Internal Flash" or  "0x08000000"
-                // For firmware (0x90040000), use interface containing "QSPI" or "0x90000000"
-                if (currentMode === 'bootloader-only') {
-                    const internalInterface = dfuInterfaces.find(iface =>
-                        iface.alternates.some(alt => alt.interfaceName &&
-                            (alt.interfaceName.includes('Internal Flash') || alt.interfaceName.includes('0x08000000')))
-                    );
-                    if (internalInterface) {
-                        dfuInterface = internalInterface;
-                        console.log('Selected Internal Flash interface');
+                // Select the correct interface based on mode
+                let selectedInterface;
+                if (currentMode === 'bootloader') {
+                    // For bootloader, use Internal Flash interface (0x08000000)
+                    selectedInterface = interfaces.find(ifc => ifc.name && ifc.name.includes("0x08000000"));
+                    if (!selectedInterface) {
+                        console.log("No interface with 0x08000000 found, using first interface");
+                        selectedInterface = interfaces[0];
                     }
                 } else {
-                    // For firmware, we want QSPI interface at 0x90000000
-                    const qspiInterface = dfuInterfaces.find(iface =>
-                        iface.alternates.some(alt => alt.interfaceName &&
-                            (alt.interfaceName.includes('QSPI') || alt.interfaceName.includes('0x90000000')))
-                    );
-                    if (qspiInterface) {
-                        dfuInterface = qspiInterface;
-                        console.log('Selected QSPI interface');
+                    // For firmware, use QSPI interface (0x90000000)
+                    selectedInterface = interfaces.find(ifc => ifc.name && ifc.name.includes("0x90000000"));
+                    if (!selectedInterface) {
+                        console.log("No interface with 0x90000000 found, using first interface");
+                        selectedInterface = interfaces[0];
                     }
                 }
 
-                const interfaceName = dfuInterface.alternates[0].interfaceName || 'unnamed';
-                console.log(`Using interface ${dfuInterface.interfaceNumber}: ${interfaceName}`);
+                console.log(`Selected interface: ${selectedInterface.name || 'unnamed'}`);
 
-                await device.claimInterface(dfuInterface.interfaceNumber);
-
-                // Determine address and upload type based on mode
-                let address, isQSPI;
-                if (currentMode === 'bootloader-only') {
-                    address = 0x08000000; // Internal flash
-                    isQSPI = false;
+                // Create the appropriate device type
+                if (currentMode === 'bootloader') {
+                    // Standard DFU for internal flash
+                    dfuDevice = new dfu.Device(selectedDevice, selectedInterface);
                 } else {
-                    address = 0x90040000; // QSPI flash
-                    isQSPI = true;
+                    // DfuSe for QSPI flash
+                    dfuDevice = new dfuse.Device(selectedDevice, selectedInterface);
+                    // Set start address for QSPI firmware
+                    dfuDevice.startAddress = 0x90040000;
                 }
 
-                await uploadBinary(binary, address, isQSPI);
+                await dfuDevice.open();
 
-                // If we just installed bootloader on blank Daisy, now upload firmware
+                // Upload the binary
+                const TRANSFER_SIZE = 2048;
+                updateStatus('Uploading binary...', 'info');
+
+                await dfuDevice.do_download(TRANSFER_SIZE, new Uint8Array(binary), false);
+
+                await dfuDevice.close();
+
+                // If we just installed bootloader, now upload firmware
                 if (needsFirmwareAfterBootloader) {
                     await handleFirmwareAfterBootloader();
                 } else {
                     // Single upload complete
                     goToStep(4);
-                    const msg = currentMode === 'firmware-only'
+                    const msg = currentMode === 'firmware'
                         ? 'Firmware update complete. Your HiChord is ready to use.'
                         : 'Setup complete. Your HiChord is ready to use.';
                     document.getElementById('completeMessage').textContent = msg;
                 }
 
             } catch (error) {
-                updateStatus('❌ Error: ' + error.message, 'error');
+                updateStatus('❌ Error: ' + error, 'error');
                 console.error(error);
             }
         }
 
         async function handleFirmwareAfterBootloader() {
-            // Close the ROM bootloader connection
-            try {
-                await device.close();
-            } catch (e) {
-                console.log('Device close result:', e.message);
-            }
-
-            // Show instructions for entering Daisy bootloader
+            // Load firmware
+            currentMode = 'firmware';
             goToStep(2);
-            currentMode = 'firmware-after-bootloader';
 
             try {
-                binary = await loadBinary(FIRMWARE_PATH);
+                const response = await fetch(FIRMWARE_PATH);
+                if (!response.ok) throw new Error('File not found: ' + FIRMWARE_PATH);
+                binary = await response.arrayBuffer();
+                console.log(`Loaded firmware: ${(binary.byteLength / 1024).toFixed(1)} KB`);
             } catch (error) {
                 updateStatus('❌ Failed to load firmware file: ' + error.message, 'error');
                 return;
@@ -653,231 +1196,8 @@
                 <p style="color: var(--gray); font-size: 13px; margin-top: 16px; font-style: italic;">Now we'll upload the HiChord firmware to QSPI flash.</p>
             `;
 
-            // Change button text
             document.getElementById('connectButton').textContent = 'Connect & Upload Firmware';
-        }
-
-        // Helper function to get DFU status
-        async function getStatus() {
-            const iface = device.configuration.interfaces[0].interfaceNumber;
-            const result = await device.controlTransferIn({
-                requestType: 'class',
-                recipient: 'interface',
-                request: DFU_GETSTATUS,
-                value: 0,
-                index: iface
-            }, 6);
-
-            return {
-                status: result.data.getUint8(0),
-                pollTimeout: result.data.getUint32(1, true) & 0xFFFFFF,
-                state: result.data.getUint8(4)
-            };
-        }
-
-        // Poll until a specific state is reached
-        async function pollUntil(statePredicate) {
-            let dfuStatus = await getStatus();
-
-            while (!statePredicate(dfuStatus.state) && dfuStatus.state !== dfuERROR) {
-                await new Promise(r => setTimeout(r, dfuStatus.pollTimeout));
-                dfuStatus = await getStatus();
-            }
-
-            if (dfuStatus.state === dfuERROR) {
-                const statusNames = {
-                    0x00: 'OK',
-                    0x01: 'errTARGET',
-                    0x02: 'errFILE',
-                    0x03: 'errWRITE',
-                    0x04: 'errERASE',
-                    0x05: 'errCHECK_ERASED',
-                    0x06: 'errPROG',
-                    0x07: 'errVERIFY',
-                    0x08: 'errADDRESS',
-                    0x09: 'errNOTDONE',
-                    0x0A: 'errFIRMWARE',
-                    0x0B: 'errVENDOR',
-                    0x0C: 'errUSBR',
-                    0x0D: 'errPOR',
-                    0x0E: 'errUNKNOWN',
-                    0x0F: 'errSTALLEDPKT'
-                };
-                const statusName = statusNames[dfuStatus.status] || `UNKNOWN(${dfuStatus.status})`;
-                throw new Error(`DFU Error: ${statusName} (status=0x${dfuStatus.status.toString(16)}, state=${dfuStatus.state})`);
-            }
-
-            return dfuStatus;
-        }
-
-        // Poll until device returns to IDLE state
-        async function pollUntilIdle(idleState) {
-            return await pollUntil(state => state === idleState);
-        }
-
-        // Send DfuSe command (SET_ADDRESS or ERASE_SECTOR)
-        async function dfuseCommand(command, param, len) {
-            const iface = device.configuration.interfaces[0].interfaceNumber;
-
-            const payload = new ArrayBuffer(len + 1);
-            const view = new DataView(payload);
-            view.setUint8(0, command);
-            if (len === 1) {
-                view.setUint8(1, param);
-            } else if (len === 4) {
-                view.setUint32(1, param, true);
-            }
-
-            await device.controlTransferOut({
-                requestType: 'class',
-                recipient: 'interface',
-                request: DFU_DNLOAD,
-                value: 0,
-                index: iface
-            }, payload);
-
-            // Wait for command to complete
-            const status = await pollUntil(state => state !== dfuDNBUSY);
-            if (status.status !== 0) {
-                throw new Error(`DfuSe command failed: status=${status.status}`);
-            }
-        }
-
-        // Erase flash sectors before programming (required for QSPI)
-        async function eraseFlash(startAddr, length) {
-            updateStatus('Erasing flash sectors...', 'info');
-
-            // Daisy bootloader may not support ERASE_SECTOR for QSPI
-            // The bootloader automatically erases during write
-            // So we'll skip manual erase and let the bootloader handle it
-            console.log(`Skipping manual erase - bootloader will handle it during write`);
-            console.log(`Address: 0x${startAddr.toString(16)}, Length: ${length} bytes`);
-
-            // Just show progress to 30% to indicate erase phase conceptually
-            document.getElementById('progressFill').style.width = '30%';
-            await new Promise(r => setTimeout(r, 100));
-        }
-
-        async function uploadBinary(data, address, isQSPI) {
-            const iface = device.configuration.interfaces[0].interfaceNumber;
-
-            // Clear any errors
-            await device.controlTransferOut({
-                requestType: 'class',
-                recipient: 'interface',
-                request: DFU_CLRSTATUS,
-                value: 0,
-                index: iface
-            }, new ArrayBuffer(0));
-
-            await new Promise(r => setTimeout(r, 100));
-
-            const BLOCK_SIZE = 2048;
-
-            if (isQSPI) {
-                // DfuSe protocol for QSPI (with SET_ADDRESS before each chunk)
-                let offset = 0;
-                let currentAddr = address;
-
-                updateStatus('Writing to QSPI flash...', 'info');
-
-                while (offset < data.length) {
-                    const size = Math.min(BLOCK_SIZE, data.length - offset);
-                    const chunk = data.slice(offset, offset + size);
-
-                    // Set address before each chunk (DfuSe protocol requirement)
-                    await dfuseCommand(DFUSE_SET_ADDRESS, currentAddr, 4);
-
-                    // Download the chunk (always use blockNum=2 for DfuSe)
-                    await device.controlTransferOut({
-                        requestType: 'class',
-                        recipient: 'interface',
-                        request: DFU_DNLOAD,
-                        value: 2,
-                        index: iface
-                    }, chunk.buffer);
-
-                    // CRITICAL: Poll until device finishes writing this block
-                    await pollUntilIdle(dfuDNLOAD_IDLE);
-
-                    offset += size;
-                    currentAddr += size;
-
-                    const progress = (offset / data.length) * 90;
-                    document.getElementById('progressFill').style.width = progress + '%';
-
-                    if (Math.floor(progress) % 10 === 0) {
-                        updateStatus(`${Math.floor(progress)}% complete`, 'info');
-                    }
-                }
-
-                // Manifestation for DfuSe: Set address back to start, then send empty block
-                await dfuseCommand(DFUSE_SET_ADDRESS, address, 4);
-            } else {
-                // Standard DFU protocol for internal flash (no SET_ADDRESS)
-                let offset = 0;
-                let blockNum = 0;
-
-                updateStatus('Writing to internal flash...', 'info');
-
-                while (offset < data.length) {
-                    const size = Math.min(BLOCK_SIZE, data.length - offset);
-                    const chunk = data.slice(offset, offset + size);
-
-                    await device.controlTransferOut({
-                        requestType: 'class',
-                        recipient: 'interface',
-                        request: DFU_DNLOAD,
-                        value: blockNum++,
-                        index: iface
-                    }, chunk.buffer);
-
-                    // Poll until idle
-                    await pollUntilIdle(dfuDNLOAD_IDLE);
-
-                    offset += size;
-
-                    const progress = (offset / data.length) * 90;
-                    document.getElementById('progressFill').style.width = progress + '%';
-
-                    if (Math.floor(progress) % 10 === 0) {
-                        updateStatus(`${Math.floor(progress)}% complete`, 'info');
-                    }
-                }
-            }
-
-            updateStatus('Finalizing upload...', 'info');
-            document.getElementById('progressFill').style.width = '95%';
-
-            // Send empty block to signal completion
-            await device.controlTransferOut({
-                requestType: 'class',
-                recipient: 'interface',
-                request: DFU_DNLOAD,
-                value: 0,
-                index: iface
-            }, new ArrayBuffer(0));
-
-            // Poll until manifestation
-            try {
-                await pollUntil(state => state === dfuMANIFEST);
-            } catch (error) {
-                // Manifestation may disconnect device, ignore errors
-                console.log('Manifest poll result:', error.message);
-            }
-
-            document.getElementById('progressFill').style.width = '100%';
-            updateStatus('Resetting device...', 'success');
-
-            // Reset the device to boot new firmware
-            try {
-                await device.reset();
-            } catch (error) {
-                // Reset often causes disconnect, which is expected
-                console.log('Reset result:', error.message);
-            }
-
-            await new Promise(r => setTimeout(r, 500));
+            needsFirmwareAfterBootloader = false;
         }
 
         function updateStatus(message, type) {
