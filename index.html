@@ -564,22 +564,32 @@
                 // Use the first DFU interface (or for QSPI, look for interface with @Internal Flash or @QSPI)
                 let dfuInterface = dfuInterfaces[0];
 
-                // If uploading to QSPI, try to find the QSPI interface
-                if (currentMode !== 'bootloader-only') {
+                // Select the appropriate interface based on address
+                // For bootloader (0x08000000), use interface containing "Internal Flash" or  "0x08000000"
+                // For firmware (0x90040000), use interface containing "QSPI" or "0x90000000"
+                if (currentMode === 'bootloader-only') {
+                    const internalInterface = dfuInterfaces.find(iface =>
+                        iface.alternates.some(alt => alt.interfaceName &&
+                            (alt.interfaceName.includes('Internal Flash') || alt.interfaceName.includes('0x08000000')))
+                    );
+                    if (internalInterface) {
+                        dfuInterface = internalInterface;
+                        console.log('Selected Internal Flash interface');
+                    }
+                } else {
+                    // For firmware, we want QSPI interface at 0x90000000
                     const qspiInterface = dfuInterfaces.find(iface =>
-                        iface.alternates.some(alt => alt.interfaceName && alt.interfaceName.includes('QSPI'))
+                        iface.alternates.some(alt => alt.interfaceName &&
+                            (alt.interfaceName.includes('QSPI') || alt.interfaceName.includes('0x90000000')))
                     );
                     if (qspiInterface) {
                         dfuInterface = qspiInterface;
                         console.log('Selected QSPI interface');
-                    } else {
-                        console.log('No QSPI interface name found, using first interface');
                     }
-                } else {
-                    console.log('Bootloader mode - using first interface');
                 }
 
-                console.log(`Using interface ${dfuInterface.interfaceNumber}: ${dfuInterface.alternates[0].interfaceName || 'unnamed'}`);
+                const interfaceName = dfuInterface.alternates[0].interfaceName || 'unnamed';
+                console.log(`Using interface ${dfuInterface.interfaceNumber}: ${interfaceName}`);
 
                 await device.claimInterface(dfuInterface.interfaceNumber);
 
@@ -762,54 +772,84 @@
 
             await new Promise(r => setTimeout(r, 100));
 
-            // For QSPI (firmware), we need to erase first
-            if (isQSPI) {
-                await eraseFlash(address, data.length);
-            }
-
             const BLOCK_SIZE = 2048;
-            let offset = 0;
-            let currentAddr = address;
 
-            updateStatus('Writing to flash memory...', 'info');
+            if (isQSPI) {
+                // DfuSe protocol for QSPI (with SET_ADDRESS before each chunk)
+                let offset = 0;
+                let currentAddr = address;
 
-            while (offset < data.length) {
-                const size = Math.min(BLOCK_SIZE, data.length - offset);
-                const chunk = data.slice(offset, offset + size);
+                updateStatus('Writing to QSPI flash...', 'info');
 
-                // Set address before each chunk (DfuSe protocol requirement)
-                await dfuseCommand(DFUSE_SET_ADDRESS, currentAddr, 4);
+                while (offset < data.length) {
+                    const size = Math.min(BLOCK_SIZE, data.length - offset);
+                    const chunk = data.slice(offset, offset + size);
 
-                // Download the chunk (always use blockNum=2 for DfuSe)
-                await device.controlTransferOut({
-                    requestType: 'class',
-                    recipient: 'interface',
-                    request: DFU_DNLOAD,
-                    value: 2,
-                    index: iface
-                }, chunk.buffer);
+                    // Set address before each chunk (DfuSe protocol requirement)
+                    await dfuseCommand(DFUSE_SET_ADDRESS, currentAddr, 4);
 
-                // CRITICAL: Poll until device finishes writing this block
-                await pollUntilIdle(dfuDNLOAD_IDLE);
+                    // Download the chunk (always use blockNum=2 for DfuSe)
+                    await device.controlTransferOut({
+                        requestType: 'class',
+                        recipient: 'interface',
+                        request: DFU_DNLOAD,
+                        value: 2,
+                        index: iface
+                    }, chunk.buffer);
 
-                offset += size;
-                currentAddr += size;
+                    // CRITICAL: Poll until device finishes writing this block
+                    await pollUntilIdle(dfuDNLOAD_IDLE);
 
-                // Progress: 30-90% for download phase
-                const downloadProgress = 30 + (offset / data.length) * 60;
-                document.getElementById('progressFill').style.width = downloadProgress + '%';
+                    offset += size;
+                    currentAddr += size;
 
-                if (Math.floor(downloadProgress) % 10 === 0) {
-                    updateStatus(`${Math.floor(downloadProgress)}% complete`, 'info');
+                    const progress = (offset / data.length) * 90;
+                    document.getElementById('progressFill').style.width = progress + '%';
+
+                    if (Math.floor(progress) % 10 === 0) {
+                        updateStatus(`${Math.floor(progress)}% complete`, 'info');
+                    }
+                }
+
+                // Manifestation for DfuSe: Set address back to start, then send empty block
+                await dfuseCommand(DFUSE_SET_ADDRESS, address, 4);
+            } else {
+                // Standard DFU protocol for internal flash (no SET_ADDRESS)
+                let offset = 0;
+                let blockNum = 0;
+
+                updateStatus('Writing to internal flash...', 'info');
+
+                while (offset < data.length) {
+                    const size = Math.min(BLOCK_SIZE, data.length - offset);
+                    const chunk = data.slice(offset, offset + size);
+
+                    await device.controlTransferOut({
+                        requestType: 'class',
+                        recipient: 'interface',
+                        request: DFU_DNLOAD,
+                        value: blockNum++,
+                        index: iface
+                    }, chunk.buffer);
+
+                    // Poll until idle
+                    await pollUntilIdle(dfuDNLOAD_IDLE);
+
+                    offset += size;
+
+                    const progress = (offset / data.length) * 90;
+                    document.getElementById('progressFill').style.width = progress + '%';
+
+                    if (Math.floor(progress) % 10 === 0) {
+                        updateStatus(`${Math.floor(progress)}% complete`, 'info');
+                    }
                 }
             }
 
             updateStatus('Finalizing upload...', 'info');
             document.getElementById('progressFill').style.width = '95%';
 
-            // Manifestation: Set address back to start, then send empty block
-            await dfuseCommand(DFUSE_SET_ADDRESS, address, 4);
-
+            // Send empty block to signal completion
             await device.controlTransferOut({
                 requestType: 'class',
                 recipient: 'interface',
