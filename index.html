@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HiChord Uploader</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 30px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .header p {
+            font-size: 14px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px 30px;
+        }
+
+        .step {
+            margin-bottom: 40px;
+            opacity: 0.4;
+            pointer-events: none;
+            transition: all 0.3s;
+        }
+
+        .step.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .step-number {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #f0f0f0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 18px;
+            color: #666;
+            margin-right: 15px;
+        }
+
+        .step.active .step-number {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .step.complete .step-number {
+            background: #10b981;
+            color: white;
+        }
+
+        .step.complete .step-number::before {
+            content: "✓";
+        }
+
+        .step-title {
+            font-size: 20px;
+            font-weight: 600;
+            color: #1f2937;
+        }
+
+        .step-content {
+            margin-left: 55px;
+        }
+
+        .instruction-box {
+            background: #f9fafb;
+            border: 2px solid #e5e7eb;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .instruction-box.warning {
+            background: #fef3c7;
+            border-color: #fbbf24;
+        }
+
+        .instruction-box h3 {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1f2937;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .instruction-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .instruction-list li {
+            padding: 8px 0;
+            color: #4b5563;
+            font-size: 15px;
+            display: flex;
+            align-items: flex-start;
+        }
+
+        .instruction-list li::before {
+            content: "→";
+            margin-right: 12px;
+            color: #667eea;
+            font-weight: bold;
+        }
+
+        .big-button {
+            width: 100%;
+            padding: 18px;
+            border: none;
+            border-radius: 12px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .big-button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .big-button.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .big-button.primary:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
+        .big-button.success {
+            background: #10b981;
+            color: white;
+        }
+
+        .big-button.warning {
+            background: #f59e0b;
+            color: white;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: #e5e7eb;
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+            display: none;
+        }
+
+        .progress-bar.show {
+            display: block;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            width: 0%;
+            transition: width 0.3s;
+        }
+
+        .status-message {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 20px 0;
+            font-weight: 600;
+            display: none;
+        }
+
+        .status-message.show {
+            display: block;
+        }
+
+        .status-message.success {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-message.error {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .status-message.info {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .tab-selector {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 12px;
+            background: #f3f4f6;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            text-align: center;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            color: #6b7280;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            background: white;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .icon {
+            font-size: 48px;
+            text-align: center;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎵 HiChord Uploader</h1>
+            <p>Simple firmware & bootloader installation</p>
+        </div>
+
+        <div class="content">
+            <!-- STEP 1: Choose Path -->
+            <div class="step active" id="step1">
+                <div class="step-header">
+                    <div class="step-number">1</div>
+                    <div class="step-title">What do you have?</div>
+                </div>
+                <div class="step-content">
+                    <div class="tab-selector">
+                        <div class="tab active" onclick="selectDevice('fresh')">
+                            🆕 New Daisy Seed
+                        </div>
+                        <div class="tab" onclick="selectDevice('hichord')">
+                            🎹 HiChord Device
+                        </div>
+                    </div>
+
+                    <div class="tab-content active" id="fresh-content">
+                        <div class="instruction-box warning">
+                            <h3>⚡ First-Time Setup Required</h3>
+                            <p style="color: #92400e; font-size: 14px; line-height: 1.6;">
+                                Your new Daisy Seed needs a bootloader installed first. This is a one-time setup.
+                            </p>
+                        </div>
+                        <button class="big-button warning" onclick="startBootloaderInstall()">
+                            Install Bootloader First →
+                        </button>
+                    </div>
+
+                    <div class="tab-content" id="hichord-content">
+                        <div class="instruction-box">
+                            <h3>✅ Ready to Update</h3>
+                            <p style="color: #4b5563; font-size: 14px; line-height: 1.6;">
+                                Your HiChord already has a bootloader. You can update the firmware directly.
+                            </p>
+                        </div>
+                        <button class="big-button primary" onclick="startFirmwareUpdate()">
+                            Update Firmware →
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 2: Enter DFU Mode -->
+            <div class="step" id="step2">
+                <div class="step-header">
+                    <div class="step-number">2</div>
+                    <div class="step-title">Connect Your Device</div>
+                </div>
+                <div class="step-content">
+                    <div class="instruction-box" id="dfu-instructions">
+                        <!-- Instructions will be inserted here -->
+                    </div>
+                    <div class="icon">🔌</div>
+                    <button class="big-button primary" id="connectButton" onclick="connectAndUpload()">
+                        Connect & Upload
+                    </button>
+                </div>
+            </div>
+
+            <!-- STEP 3: Upload Progress -->
+            <div class="step" id="step3">
+                <div class="step-header">
+                    <div class="step-number">3</div>
+                    <div class="step-title">Uploading...</div>
+                </div>
+                <div class="step-content">
+                    <div class="progress-bar show">
+                        <div class="progress-fill" id="progressFill"></div>
+                    </div>
+                    <div class="status-message show info" id="statusMessage">
+                        Preparing upload...
+                    </div>
+                </div>
+            </div>
+
+            <!-- STEP 4: Complete -->
+            <div class="step" id="step4">
+                <div class="step-header">
+                    <div class="step-number">4</div>
+                    <div class="step-title">All Done!</div>
+                </div>
+                <div class="step-content">
+                    <div class="icon">✨</div>
+                    <div class="status-message show success" id="completeMessage">
+                        <!-- Success message will be inserted here -->
+                    </div>
+                    <button class="big-button success" onclick="location.reload()">
+                        Upload More Devices
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Binary file paths - relative to this HTML file
+        const FIRMWARE_PATH = 'firmware/hichord_unified.bin';
+        const BOOTLOADER_PATH = 'boot/dsy_bootloader_v6_2-extdfu-10ms.bin';
+
+        // DFU Constants
+        const DFU_DNLOAD = 0x01;
+        const DFU_GETSTATUS = 0x03;
+        const DFU_CLRSTATUS = 0x04;
+        const DFU_ABORT = 0x06;
+
+        // State
+        let currentMode = null;
+        let device = null;
+        let binary = null;
+
+        // UI Functions
+        function selectDevice(type) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+            if (type === 'fresh') {
+                event.target.classList.add('active');
+                document.getElementById('fresh-content').classList.add('active');
+            } else {
+                event.target.closest('.tab').classList.add('active');
+                document.getElementById('hichord-content').classList.add('active');
+            }
+        }
+
+        function goToStep(stepNum) {
+            document.querySelectorAll('.step').forEach((step, idx) => {
+                step.classList.remove('active', 'complete');
+                if (idx + 1 < stepNum) step.classList.add('complete');
+                if (idx + 1 === stepNum) step.classList.add('active');
+            });
+        }
+
+        async function startBootloaderInstall() {
+            currentMode = 'bootloader';
+            goToStep(2);
+
+            try {
+                binary = await loadBinary(BOOTLOADER_PATH);
+            } catch (error) {
+                updateStatus('❌ Failed to load bootloader file: ' + error.message, 'error');
+                return;
+            }
+
+            document.getElementById('dfu-instructions').innerHTML = `
+                <h3>Enter Bootloader Mode (ROM)</h3>
+                <ul class="instruction-list">
+                    <li>Connect Daisy Seed via <strong>Micro USB</strong></li>
+                    <li>Press and <strong>HOLD</strong> the BOOT button</li>
+                    <li>While holding BOOT, press and <strong>RELEASE</strong> RESET</li>
+                    <li>Now release the BOOT button</li>
+                    <li>LED should stay solid (ROM bootloader active)</li>
+                </ul>
+            `;
+        }
+
+        async function startFirmwareUpdate() {
+            currentMode = 'firmware';
+            goToStep(2);
+
+            try {
+                binary = await loadBinary(FIRMWARE_PATH);
+            } catch (error) {
+                updateStatus('❌ Failed to load firmware file: ' + error.message, 'error');
+                return;
+            }
+
+            document.getElementById('dfu-instructions').innerHTML = `
+                <h3>Enter Firmware Update Mode</h3>
+                <ul class="instruction-list">
+                    <li>Connect HiChord via <strong>USB-C</strong></li>
+                    <li>Hold <strong>Fn1 + Fn2 + Fn3</strong> for 5 seconds</li>
+                    <li>LED should pulse (DFU mode activated)</li>
+                </ul>
+                <p style="color: #6b7280; font-size: 13px; margin-top: 12px;"><em>Alternative: Press RESET then BOOT within 2 seconds</em></p>
+            `;
+        }
+
+        async function loadBinary(path) {
+            updateStatus('Loading binary file...', 'info');
+            const response = await fetch(path);
+            if (!response.ok) throw new Error('File not found: ' + path);
+            const data = await response.arrayBuffer();
+            updateStatus(`Loaded ${(data.byteLength / 1024).toFixed(1)} KB`, 'success');
+            return new Uint8Array(data);
+        }
+
+        async function connectAndUpload() {
+            try {
+                goToStep(3);
+                updateStatus('Connecting to device...', 'info');
+
+                device = await navigator.usb.requestDevice({
+                    filters: [{ vendorId: 0x0483, productId: 0xdf11 }]
+                });
+
+                await device.open();
+                if (!device.configuration) await device.selectConfiguration(1);
+
+                const dfuInterface = device.configuration.interfaces.find(
+                    iface => iface.alternates.some(alt => alt.interfaceClass === 0xFE && alt.interfaceSubclass === 0x01)
+                );
+
+                if (!dfuInterface) throw new Error('DFU interface not found');
+
+                await device.claimInterface(dfuInterface.interfaceNumber);
+
+                const address = currentMode === 'bootloader' ? 0x08000000 : 0x90040000;
+                const isQSPI = currentMode === 'firmware';
+
+                await uploadBinary(binary, address, isQSPI);
+
+                goToStep(4);
+                const msg = currentMode === 'bootloader'
+                    ? '🎉 Bootloader installed! Now upload firmware (restart and choose "HiChord Device")'
+                    : '🎵 Firmware updated! Your HiChord is ready to play!';
+                document.getElementById('completeMessage').textContent = msg;
+
+            } catch (error) {
+                updateStatus('❌ Error: ' + error.message, 'error');
+                console.error(error);
+            }
+        }
+
+        async function uploadBinary(data, address, isQSPI) {
+            const iface = device.configuration.interfaces[0].interfaceNumber;
+
+            await device.controlTransferOut({
+                requestType: 'class',
+                recipient: 'interface',
+                request: DFU_CLRSTATUS,
+                value: 0,
+                index: iface
+            }, new ArrayBuffer(0));
+
+            await new Promise(r => setTimeout(r, 100));
+
+            const addrCmd = new ArrayBuffer(5);
+            const view = new DataView(addrCmd);
+            view.setUint8(0, 0x21);
+            view.setUint32(1, address, true);
+
+            await device.controlTransferOut({
+                requestType: 'class',
+                recipient: 'interface',
+                request: DFU_DNLOAD,
+                value: 0,
+                index: iface
+            }, addrCmd);
+
+            await new Promise(r => setTimeout(r, 100));
+
+            const BLOCK_SIZE = 2048;
+            const QSPI_DELAY = 10; // Optimized: 10ms instead of 20ms
+            let offset = 0;
+            let blockNum = 2;
+
+            updateStatus('Writing to flash memory...', 'info');
+
+            while (offset < data.length) {
+                const size = Math.min(BLOCK_SIZE, data.length - offset);
+                const chunk = data.slice(offset, offset + size);
+
+                await device.controlTransferOut({
+                    requestType: 'class',
+                    recipient: 'interface',
+                    request: DFU_DNLOAD,
+                    value: blockNum++,
+                    index: iface
+                }, chunk.buffer);
+
+                if (isQSPI) {
+                    await new Promise(r => setTimeout(r, QSPI_DELAY));
+                }
+
+                offset += size;
+                const progress = (offset / data.length) * 100;
+                document.getElementById('progressFill').style.width = progress + '%';
+
+                if (Math.floor(progress) % 10 === 0) {
+                    updateStatus(`${Math.floor(progress)}% complete`, 'info');
+                }
+            }
+
+            await device.controlTransferOut({
+                requestType: 'class',
+                recipient: 'interface',
+                request: DFU_DNLOAD,
+                value: 0,
+                index: iface
+            }, new ArrayBuffer(0));
+
+            updateStatus('Upload complete, device resetting...', 'success');
+            await new Promise(r => setTimeout(r, 1000));
+        }
+
+        function updateStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = 'status-message show ' + type;
+        }
+
+        window.addEventListener('load', () => {
+            if (!navigator.usb) {
+                alert('⚠️ WebUSB not supported. Please use Chrome or Edge browser.');
+            }
+        });
+    </script>
+</body>
+</html>
