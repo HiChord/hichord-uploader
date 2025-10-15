@@ -180,12 +180,14 @@ var device = null;
 
     document.addEventListener('DOMContentLoaded', event => {
         let connectButton = document.querySelector("#connect");
+        let connect2Button = document.querySelector("#connect2");
         let bootloaderButton = document.querySelector("#bootloader");
         let downloadButton = document.querySelector("#download");
         let statusDisplay = document.querySelector("#status");
-        let infoDisplay = document.querySelector("#usbInfo");
-        let dfuDisplay = document.querySelector("#dfuInfo");
         let downloadLog = document.querySelector("#downloadLog");
+        let downloadLog2 = document.querySelector("#downloadLog2");
+        let step1 = document.querySelector("#step1");
+        let step2 = document.querySelector("#step2");
 
         let transferSize = 1024;
         let manifestationTolerant = true;
@@ -221,9 +223,8 @@ var device = null;
                 statusDisplay.textContent = reason;
             }
 
-            connectButton.textContent = "CONNECT";
-            infoDisplay.textContent = "";
-            dfuDisplay.textContent = "";
+            if (connectButton) connectButton.textContent = "CONNECT";
+            if (connect2Button) connect2Button.textContent = "CONNECT";
             bootloaderButton.disabled = true;
             downloadButton.disabled = true;
         }
@@ -307,12 +308,13 @@ var device = null;
             clearLog(downloadLog);
 
             // Display basic USB information
-            statusDisplay.textContent = '';
-            connectButton.textContent = 'Disconnect';
-            infoDisplay.textContent = "";
-
-            // Display basic dfu-util style info
-            dfuDisplay.textContent = formatDFUSummary(device) + "\n" + memorySummary;
+            statusDisplay.textContent = 'Connected: ' + device.device_.productName;
+            if (connectButton && !connectButton.classList.contains('used')) {
+                connectButton.textContent = 'Disconnect';
+            }
+            if (connect2Button && !connect2Button.classList.contains('used')) {
+                connect2Button.textContent = 'Disconnect';
+            }
 
             // CRITICAL: Set start address with QSPI offset (lines 432-433 from original)
             if (device.memoryInfo) {
@@ -332,7 +334,7 @@ var device = null;
         }
 
         // CRITICAL: Interface selection filtering (line 532 from original)
-        connectButton.addEventListener('click', function() {
+        async function handleConnect(button) {
             if (device) {
                 device.close().then(onDisconnect);
                 device = null;
@@ -346,6 +348,7 @@ var device = null;
                         } else if (interfaces.length == 1) {
                             await fixInterfaceNames(selectedDevice, interfaces);
                             device = await connect(new dfu.Device(selectedDevice, interfaces[0]));
+                            button.classList.add('used');
                         } else {
                             await fixInterfaceNames(selectedDevice, interfaces);
                             // CRITICAL LINE 532: Filter by internal flash address
@@ -355,6 +358,7 @@ var device = null;
                                 statusDisplay.textContent = "The selected device does not have a Flash Memory section at address 0x08000000.";
                             } else {
                                 device = await connect(new dfu.Device(selectedDevice, filteredInterfaceList[0]));
+                                button.classList.add('used');
                             }
                         }
                     }
@@ -362,7 +366,10 @@ var device = null;
                     statusDisplay.textContent = error;
                 });
             }
-        });
+        }
+
+        connectButton.addEventListener('click', () => handleConnect(connectButton));
+        connect2Button.addEventListener('click', () => handleConnect(connect2Button));
 
         // EXACT COPY from Electro-Smith bootloader button (lines 620-662)
         bootloaderButton.addEventListener('click', async function(event) {
@@ -370,6 +377,7 @@ var device = null;
             event.stopPropagation();
 
             if (device && bootloaderFirmwareFile != null) {
+                downloadLog.classList.remove('hidden');
                 setLogContext(downloadLog);
                 clearLog(downloadLog);
 
@@ -396,7 +404,9 @@ var device = null;
                 // CRITICAL LINE 639: Upload bootloader using do_download
                 await device.do_download(transferSize, bootloaderFirmwareFile, manifestationTolerant).then(
                     () => {
-                        logInfo("Done!");
+                        logInfo("Done! Bootloader installed.");
+                        logInfo("Now proceed to STEP 2 below to upload firmware.");
+                        step2.classList.add('active');
                         setLogContext(null);
                         if (!manifestationTolerant) {
                             device.waitDisconnected(5000).then(
@@ -425,8 +435,9 @@ var device = null;
             event.stopPropagation();
 
             if (device && firmwareFile != null) {
-                setLogContext(downloadLog);
-                clearLog(downloadLog);
+                downloadLog2.classList.remove('hidden');
+                setLogContext(downloadLog2);
+                clearLog(downloadLog2);
 
                 // Clear any error state first
                 try {
@@ -451,7 +462,8 @@ var device = null;
                 // CRITICAL LINE 728: Upload firmware using do_download
                 await device.do_download(transferSize, firmwareFile, manifestationTolerant).then(
                     () => {
-                        logInfo("Done!");
+                        logInfo("Done! Firmware programming complete.");
+                        logInfo("Device will automatically reset and boot your firmware.");
                         setLogContext(null);
                         if (!manifestationTolerant) {
                             device.waitDisconnected(5000).then(

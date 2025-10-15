@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>HiChord Uploader</title>
+    <title>HiChord Production Uploader</title>
     <style>
         :root {
             --black: #0A0A0A;
@@ -93,14 +93,8 @@
             padding-left: 20px;
         }
 
-        .button-group {
-            display: flex;
-            gap: 16px;
-            margin-bottom: 20px;
-        }
-
         button {
-            flex: 1;
+            width: 100%;
             padding: 16px 24px;
             font-size: 14px;
             font-weight: 600;
@@ -111,6 +105,7 @@
             color: var(--black);
             cursor: pointer;
             transition: all 0.2s;
+            margin-bottom: 16px;
         }
 
         button:hover:not(:disabled) {
@@ -153,6 +148,7 @@
             font-size: 14px;
             color: var(--gray);
             line-height: 1.5;
+            margin-bottom: 8px;
         }
 
         #status {
@@ -164,44 +160,33 @@
             text-align: center;
         }
 
-        #usbInfo, #dfuInfo {
-            font-size: 12px;
-            font-family: 'Courier New', monospace;
-            color: var(--gray);
-            white-space: pre-wrap;
-            padding: 12px;
-            background: var(--lightest-gray);
-            margin-bottom: 12px;
+        #downloadLog, #downloadLog2 {
+            min-height: 60px;
             max-height: 200px;
-            overflow-y: auto;
-        }
-
-        #downloadLog {
-            min-height: 100px;
-            max-height: 300px;
             overflow-y: auto;
             padding: 16px;
             background: var(--lightest-gray);
             font-size: 13px;
+            margin-top: 16px;
         }
 
-        #downloadLog p {
+        #downloadLog p, #downloadLog2 p {
             margin: 4px 0;
         }
 
-        #downloadLog .info {
+        #downloadLog .info, #downloadLog2 .info {
             color: var(--black);
         }
 
-        #downloadLog .warning {
+        #downloadLog .warning, #downloadLog2 .warning {
             color: var(--warning);
         }
 
-        #downloadLog .error {
+        #downloadLog .error, #downloadLog2 .error {
             color: var(--error);
         }
 
-        #downloadLog progress {
+        #downloadLog progress, #downloadLog2 progress {
             width: 100%;
             height: 8px;
             margin: 8px 0;
@@ -226,9 +211,9 @@
 
         .instructions {
             font-size: 14px;
-            color: var(--gray);
+            color: var(--black);
             margin-bottom: 20px;
-            line-height: 1.6;
+            line-height: 1.7;
         }
 
         .instructions ol {
@@ -236,11 +221,16 @@
         }
 
         .instructions li {
-            margin: 8px 0;
+            margin: 10px 0;
         }
 
         .instructions strong {
             color: var(--black);
+            font-weight: 600;
+        }
+
+        .hidden {
+            display: none;
         }
     </style>
 </head>
@@ -248,44 +238,61 @@
     <div class="container">
         <div class="header">
             <h1>HICHORD</h1>
-            <p>FIRMWARE UPLOADER // WEB DFU</p>
+            <p>PRODUCTION BOOTLOADER + FIRMWARE UPLOADER</p>
         </div>
 
-        <!-- Step 1: Connect Your Device -->
-        <div class="step active">
+        <!-- Step 1: Install Bootloader -->
+        <div class="step active" id="step1">
             <div class="step-header">
-                <span class="step-number">01 //</span>
-                <span>ENTER DFU MODE</span>
+                <span class="step-number">STEP 1 //</span>
+                <span>INSTALL USB-C BOOTLOADER TO INTERNAL FLASH</span>
             </div>
             <div class="step-content">
-                <div class="instructions">
-                    <ol>
-                        <li><strong>Hold the BOOT button</strong> on your Daisy Seed</li>
-                        <li><strong>While holding BOOT</strong>, press and release the RESET button</li>
-                        <li><strong>Release the BOOT button</strong></li>
-                        <li><strong>Connect USB cable</strong> to your computer</li>
-                    </ol>
+                <div class="info-box">
+                    <h3>HARDWARE INSTRUCTIONS</h3>
+                    <div class="instructions">
+                        <ol>
+                            <li>Connect <strong>Daisy Seed</strong> via <strong>Micro USB</strong> to computer</li>
+                            <li>Press and <strong>HOLD</strong> the <strong>BOOT</strong> button on Daisy Seed</li>
+                            <li>While holding BOOT, press and <strong>RELEASE</strong> the <strong>RESET</strong> button</li>
+                            <li>Release the <strong>BOOT</strong> button</li>
+                            <li>LED should be <strong>solid</strong> (ROM bootloader mode)</li>
+                        </ol>
+                    </div>
                 </div>
 
                 <div id="status">Ready to connect</div>
-                <div id="usbInfo"></div>
-                <div id="dfuInfo"></div>
 
                 <button id="connect" class="primary">CONNECT</button>
+                <button id="bootloader" disabled>FLASH BOOTLOADER</button>
+
+                <div id="downloadLog" class="hidden"></div>
             </div>
         </div>
 
-        <!-- Step 2: Upload -->
-        <div class="step active">
+        <!-- Step 2: Upload Firmware -->
+        <div class="step" id="step2">
             <div class="step-header">
-                <span class="step-number">02 //</span>
-                <span>UPLOAD</span>
+                <span class="step-number">STEP 2 //</span>
+                <span>UPLOAD FIRMWARE TO QSPI FLASH</span>
             </div>
             <div class="step-content">
-                <button id="bootloader" disabled style="width: 100%; margin-bottom: 16px;">FLASH BOOTLOADER</button>
-                <button id="download" class="primary" disabled style="width: 100%;">PROGRAM FIRMWARE</button>
+                <div class="info-box">
+                    <h3>HARDWARE INSTRUCTIONS - ENTER DAISY BOOTLOADER</h3>
+                    <div class="instructions">
+                        <ol>
+                            <li>Connect <strong>HiChord PCB</strong> via <strong>USB-C</strong> to computer</li>
+                            <li>Press the <strong>RESET</strong> button (short press)</li>
+                            <li>Within 2 seconds, press the <strong>BOOT</strong> button (short press)</li>
+                            <li>LED should <strong>pulse/blink</strong> (Daisy bootloader mode)</li>
+                        </ol>
+                    </div>
+                </div>
 
-                <div id="downloadLog"></div>
+                <button id="connect2" class="primary">CONNECT</button>
+                <button id="download" disabled>PROGRAM FIRMWARE</button>
+
+                <div id="downloadLog2" class="hidden"></div>
             </div>
         </div>
     </div>
