@@ -493,11 +493,11 @@
             }
 
             dfu.Device.prototype.logDebug = function(msg) {
-                console.log(msg);
+                console.log('[DFU DEBUG] ' + msg);
             };
 
             dfu.Device.prototype.logInfo = function(msg) {
-                console.log(msg);
+                console.log('[DFU INFO] ' + msg);
                 updateStatus(msg, 'info');
             };
 
@@ -506,7 +506,8 @@
             };
 
             dfu.Device.prototype.logError = function(msg) {
-                console.log(msg);
+                console.error('[DFU ERROR] ' + msg);
+                updateStatus('Error: ' + msg, 'error');
             };
 
             dfu.Device.prototype.logProgress = function(done, total) {
@@ -667,6 +668,7 @@
                 let transaction = 0;
 
                 this.logInfo("Copying data from browser to DFU device");
+                this.logDebug(`Total size: ${expected_size} bytes, Transfer size: ${xfer_size} bytes`);
 
                 // Initialize progress to 0
                 this.logProgress(bytes_sent, expected_size);
@@ -678,9 +680,11 @@
                     let bytes_written = 0;
                     let dfu_status;
                     try {
+                        this.logDebug(`Transaction ${transaction}: Sending ${chunk_size} bytes...`);
                         bytes_written = await this.download(data.slice(bytes_sent, bytes_sent+chunk_size), transaction++);
-                        this.logDebug("Sent " + bytes_written + " bytes");
+                        this.logDebug(`Transaction complete: Sent ${bytes_written} bytes, polling device status...`);
                         dfu_status = await this.poll_until_idle(dfu.dfuDNLOAD_IDLE);
+                        this.logDebug(`Device status: state=${dfu_status.state}, status=${dfu_status.status}`);
                     } catch (error) {
                         throw "Error during DFU download: " + error;
                     }
@@ -1129,19 +1133,25 @@
                 }
 
                 console.log(`Selected interface: ${selectedInterface.name || 'unnamed'}`);
+                console.log(`Interface number: ${selectedInterface.interface.interfaceNumber}`);
+                console.log(`Alternate setting: ${selectedInterface.alternate.alternateSetting}`);
 
                 // Create the appropriate device type
                 if (currentMode === 'bootloader') {
                     // Standard DFU for internal flash
                     dfuDevice = new dfu.Device(selectedDevice, selectedInterface);
+                    console.log('[BOOTLOADER] Created standard DFU device for internal flash');
                 } else {
                     // DfuSe for QSPI flash
                     dfuDevice = new dfuse.Device(selectedDevice, selectedInterface);
                     // Set start address for QSPI firmware
                     dfuDevice.startAddress = 0x90040000;
+                    console.log('[FIRMWARE] Created DfuSe device for QSPI flash at 0x90040000');
                 }
 
+                console.log('[DEVICE] Opening device and selecting alternate interface...');
                 await dfuDevice.open();
+                console.log('[DEVICE] Device opened successfully, alternate interface selected');
 
                 // Upload the binary
                 const TRANSFER_SIZE = 2048;
