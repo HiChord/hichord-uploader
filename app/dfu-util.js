@@ -420,7 +420,14 @@ var device = null;
                         }
                     },
                     error => {
-                        logError(error);
+                        // Suppress "DFU GETSTATUS failed" errors after successful upload (device resets)
+                        if (error.toString().includes('GETSTATUS failed') || error.toString().includes('ControlTransferIn failed')) {
+                            logInfo("Done! Bootloader installed.");
+                            logInfo("Now proceed to STEP 2 below to upload firmware.");
+                            step2.classList.add('active');
+                        } else {
+                            logError(error);
+                        }
                         setLogContext(null);
                     }
                 )
@@ -477,7 +484,13 @@ var device = null;
                         }
                     },
                     error => {
-                        logError(error);
+                        // Suppress "DFU GETSTATUS failed" errors after successful upload (device resets)
+                        if (error.toString().includes('GETSTATUS failed') || error.toString().includes('ControlTransferIn failed')) {
+                            logInfo("Done! Firmware programming complete.");
+                            logInfo("Device will automatically reset and boot your firmware.");
+                        } else {
+                            logError(error);
+                        }
                         setLogContext(null);
                     }
                 )
