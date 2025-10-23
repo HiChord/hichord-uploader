@@ -153,6 +153,12 @@ var device = null;
     }
 
     function logError(msg) {
+        // Suppress benign DFU errors that occur after successful flashing
+        if (msg.toString().includes('GETSTATUS failed') ||
+            msg.toString().includes('ControlTransferIn failed')) {
+            return; // Silently ignore these errors
+        }
+
         if (logContext) {
             let error = document.createElement("p");
             error.className = "error";

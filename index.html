@@ -277,7 +277,7 @@
         </div>
 
         <div class="firmware-version">
-            Firmware Build: 2025-10-23 00:14 (v2.01)
+            Firmware Build: 2025-10-23 01:08 (v2.01)
         </div>
 
         <!-- Step 1: Install Bootloader -->
@@ -295,7 +295,7 @@
                             <li>Press and <strong>HOLD</strong> the <strong>BOOT</strong> button on Daisy Seed</li>
                             <li>While holding BOOT, press and <strong>RELEASE</strong> the <strong>RESET</strong> button</li>
                             <li>Release the <strong>BOOT</strong> button</li>
-                            <li>LED should be <strong>solid</strong> (ROM bootloader mode)</li>
+                            <li>LED should briefly blink fast then become <strong>solid red</strong> (ROM bootloader mode)</li>
                             <li>Click <strong>"Connect"</strong> button</li>
                             <li>Browser window shows device: <strong>"DFU in FS mode paired"</strong></li>
                             <li>Click <strong>"Connect"</strong> in Browser window</li>
@@ -326,8 +326,8 @@
                         <ol>
                             <li>Power on <strong>HiChord</strong></li>
                             <li>Press the <strong>RESET</strong> button on Daisy Seed (short press)</li>
-                            <li>Within 1 second, press the <strong>BOOT</strong> button (short press)</li>
-                            <li>LED should <strong>pulse/blink</strong> (Daisy bootloader mode)</li>
+                            <li>Within <strong>10ms</strong>, press the <strong>BOOT</strong> button (short press - timing is critical!)</li>
+                            <li>LED should show a <strong>breathing/pulsing pattern</strong> (Daisy bootloader mode - stays active indefinitely)</li>
                             <li>Connect <strong>HiChord PCB</strong> via <strong>USB-C</strong> to computer</li>
                             <li>Click <strong>"Connect"</strong> button</li>
                             <li>Browser window shows device: <strong>"Daisy Bootloader"</strong> (You may need to unplug and re-connect USB-C for this to appear. Make sure HiChord PCB is powered on).</li>
