@@ -194,6 +194,8 @@ var device = null;
         let downloadLog2 = document.querySelector("#downloadLog2");
         let step1 = document.querySelector("#step1");
         let step2 = document.querySelector("#step2");
+        let firmwareSelect = document.querySelector("#firmwareSelect");
+        let versionInfo = document.querySelector("#versionInfo");
 
         let transferSize = 1024;
         let manifestationTolerant = true;
@@ -213,16 +215,33 @@ var device = null;
                 console.error('Failed to load bootloader:', error);
             });
 
-        // Load firmware
-        fetch('firmware/hichord_unified.bin')
-            .then(response => response.arrayBuffer())
-            .then(buffer => {
-                firmwareFile = buffer;
-                console.log(`Loaded firmware: ${niceSize(firmwareFile.byteLength)}`);
-            })
-            .catch(error => {
-                console.error('Failed to load firmware:', error);
-            });
+        // Function to load firmware from selected option
+        function loadSelectedFirmware() {
+            let selectedOption = firmwareSelect.options[firmwareSelect.selectedIndex];
+            let firmwarePath = selectedOption.value;
+            let version = selectedOption.dataset.version;
+            let build = selectedOption.dataset.build;
+
+            // Update version info display
+            versionInfo.textContent = `Firmware Version: ${version} | Build: ${build}`;
+
+            // Load the firmware binary
+            fetch(firmwarePath)
+                .then(response => response.arrayBuffer())
+                .then(buffer => {
+                    firmwareFile = buffer;
+                    console.log(`Loaded firmware (${version}): ${niceSize(firmwareFile.byteLength)}`);
+                })
+                .catch(error => {
+                    console.error('Failed to load firmware:', error);
+                });
+        }
+
+        // Load firmware on page load
+        loadSelectedFirmware();
+
+        // Reload firmware when selection changes
+        firmwareSelect.addEventListener('change', loadSelectedFirmware);
 
         function onDisconnect(reason) {
             if (reason) {
